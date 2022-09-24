@@ -1,0 +1,7 @@
+name: Man10Crafting
+version: '${version}'
+main: tororo1066.man10crafting.Man10Crafting
+api-version: 1.17
+
+commands:
+  mcraft:
