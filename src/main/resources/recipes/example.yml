@@ -1,9 +1,0 @@
-type: shaped
-
-material:
-  x: STONE
-shape:
-  - "x x"
-  - " x "
-  - "x x"
-result:

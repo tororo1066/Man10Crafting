@@ -4,6 +4,7 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.PrepareItemCraftEvent
 import org.bukkit.inventory.*
 import tororo1066.man10crafting.Man10Crafting
 import java.io.File
@@ -12,6 +13,7 @@ class RecipeData {
 
     lateinit var type: Type
     var namespace = ""
+    var category = ""
     val materials = HashMap<Char,ItemStack>()
     val shapelessMaterials = ArrayList<ItemStack>()
     val shape = ArrayList<String>()
@@ -22,26 +24,26 @@ class RecipeData {
     lateinit var smithingMaterial: ItemStack
 
     var permission = ""
+    var enabled = true
+
+    private var materialChars: String? = null
 
     private lateinit var recipe: Recipe
 
     companion object{
-        fun loadFromYml(id: String): RecipeData {
-            val yml = Man10Crafting.sConfig.getConfig("recipes/$id")?:return RecipeData()
+        fun loadFromYml(category: String, id: String): RecipeData {
+            val yml = Man10Crafting.sConfig.getConfig("recipes/${category}/$id")?:return RecipeData()
             val recipe = RecipeData()
             recipe.namespace = id
+            recipe.category = category
             recipe.type = Type.valueOf(yml.getString("type","shaped")!!.uppercase())
             when(recipe.type){
                 Type.SHAPED->{
                     val section = yml.getConfigurationSection("material")!!
                     section.getKeys(false).forEach {
-                        Bukkit.broadcastMessage(section.getItemStack(it)!!.toString())
                         recipe.materials[it.toCharArray()[0]] = section.getItemStack(it)!!
                     }
-                    yml.getStringList("shape").forEach {
-                        Bukkit.broadcastMessage((it == "a  ").toString())
-                        recipe.shape.add(it)
-                    }
+                    recipe.shape.addAll(yml.getStringList("shape"))
 
                 }
                 Type.SHAPELESS->{
@@ -60,6 +62,7 @@ class RecipeData {
             }
             recipe.result = yml.getItemStack("result")!!
             recipe.permission = yml.getString("permission","")!!
+            recipe.enabled = yml.getBoolean("enabled",true)
 
             return recipe
         }
@@ -70,14 +73,11 @@ class RecipeData {
         val recipe: Recipe = when(type){
             Type.SHAPED->{
                 val shaped = ShapedRecipe(namespace,result)
+                materialChars = shape.joinToString("")
                 shaped.shape(shape[0],shape[1],shape[2])
                 materials.forEach {
-                    shaped.ingredientMap[it.key] = it.value
-                    Bukkit.broadcastMessage(it.key.toString())
+                    shaped.setIngredient(it.key,it.value)
                 }
-                Bukkit.broadcastMessage(shaped.shape[0])
-                Bukkit.broadcastMessage(shaped.shape[1])
-                Bukkit.broadcastMessage(shaped.shape[2])
                 shaped
             }
             Type.SHAPELESS->{
@@ -104,11 +104,12 @@ class RecipeData {
 
     fun saveConfig(){
         if (Man10Crafting.sConfig.exists("recipes/${namespace}")){
-            File("${Man10Crafting.plugin.dataFolder.path}/recipes/${namespace}").delete()
+            File("${Man10Crafting.plugin.dataFolder.path}/recipes/${category}/${namespace}.yml").delete()
         }
-        val file = File("${Man10Crafting.plugin.dataFolder.path}/recipes/${namespace}.yml")
+        val file = File("${Man10Crafting.plugin.dataFolder.path}/recipes/${category}/${namespace}.yml")
+        if (!file.parentFile.exists()) file.parentFile.mkdirs()
         file.createNewFile()
-        val config = Man10Crafting.sConfig.getConfig("recipes/${namespace}")!!
+        val config = Man10Crafting.sConfig.getConfig("recipes/${category}/${namespace}")!!
 
         config.set("type",type.name.lowercase())
 
@@ -135,32 +136,40 @@ class RecipeData {
             config.set("permission",permission)
         }
 
+        config.set("enabled",enabled)
+
         config.set("result",result)
 
-        Man10Crafting.sConfig.saveConfig(config,"recipes/${namespace}")
+        Man10Crafting.sConfig.saveConfig(config,"recipes/${category}/${namespace}")
     }
 
     fun register(){
         if (!::recipe.isInitialized){
             create()
         }
-        Bukkit.removeRecipe(NamespacedKey(Man10Crafting.plugin,namespace))
+        val namespacedKey = NamespacedKey(Man10Crafting.plugin,namespace)
+        val defaultRecipe = Bukkit.getRecipe(namespacedKey)
+        if (defaultRecipe != null){
+            Bukkit.removeRecipe(namespacedKey)
+        }
         Bukkit.addRecipe(recipe)
         Man10Crafting.recipes[namespace] = this
     }
 
-    fun canCraft(p: Player): Boolean{
+    fun checkNeed(p: Player): Boolean{
+        if (!enabled) return false
         if (permission.isNotBlank() && !p.hasPermission(permission))return false
 
         return true
     }
 
-    enum class Type{
-        SHAPED,
-        SHAPELESS,
-        FURNACE,
-        SMOKING,
-        BLASTING,
-        SMITHING
+
+    enum class Type(val material: Material){
+        SHAPED(Material.CRAFTING_TABLE),
+        SHAPELESS(Material.CRAFTING_TABLE),
+        FURNACE(Material.FURNACE),
+        SMOKING(Material.SMOKER),
+        BLASTING(Material.BLAST_FURNACE),
+        SMITHING(Material.SMITHING_TABLE)
     }
 }

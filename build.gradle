@@ -22,7 +22,7 @@ repositories {
 dependencies {
     compileOnly 'io.papermc.paper:paper-api:1.17.1-R0.1-SNAPSHOT'
     api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    api 'com.github.tororo1066.TororoPluginAPI:TororoPluginAPI:b20d96612b'
+    api 'com.github.tororo1066.TororoPluginAPI:TororoPluginAPI:9e06b14aa6'
 }
 
 def targetJavaVersion = 16

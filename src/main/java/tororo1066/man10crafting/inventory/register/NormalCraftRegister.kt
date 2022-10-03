@@ -1,6 +1,5 @@
-package tororo1066.man10crafting.inventory
+package tororo1066.man10crafting.inventory.register
 
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemStack
@@ -11,7 +10,7 @@ import tororo1066.tororopluginapi.sInventory.SInventory
 import tororo1066.tororopluginapi.sInventory.SInventoryItem
 import tororo1066.tororopluginapi.sItem.SItem
 
-class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless",5) {
+open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless",5) {
 
     var isShaped = false
     var perm = ""
@@ -24,6 +23,11 @@ class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless"
 
     override fun renderMenu(): Boolean {
 
+        val saveItems = HashMap<Int,ItemStack>()
+        listOf(10,11,12,19,20,21,28,29,30).forEach {
+            saveItems[it] = getItem(it)?:return@forEach
+        }
+
         setItems(0..44,SInventoryItem(SItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE).setDisplayName(" ")).setCanClick(false))
 
         removeItems(10..12)
@@ -31,38 +35,60 @@ class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless"
         removeItems(28..30)
         removeItem(24)
 
-        setItem(22, SItem(Material.GREEN_TERRACOTTA).setDisplayName("§a自由変形レシピ").toSInventoryItem().setCanClick(false).setBiClickEvent { item, _ ->
-            isShaped = true
-            setItem(22,SItem(Material.RED_TERRACOTTA).setDisplayName("§c定型レシピ").toSInventoryItem().setCanClick(false).setClickEvent {
+        saveItems.forEach {
+            setItem(it.key,it.value)
+        }
+
+        if (isShaped){
+            setItem(22, SItem(Material.RED_TERRACOTTA).setDisplayName("§c定型レシピ").toSInventoryItem().setCanClick(false).setBiClickEvent { item, _ ->
                 isShaped = false
-                setItem(22,item)
+                setItem(22,SItem(Material.GREEN_TERRACOTTA).setDisplayName("§a自由変形レシピ").toSInventoryItem().setCanClick(false).setClickEvent {
+                    isShaped = true
+                    setItem(22,item)
+                })
             })
-        })
+        } else {
+            setItem(22, SItem(Material.GREEN_TERRACOTTA).setDisplayName("§a自由変形レシピ").toSInventoryItem().setCanClick(false).setBiClickEvent { item, _ ->
+                isShaped = true
+                setItem(22,SItem(Material.RED_TERRACOTTA).setDisplayName("§c定型レシピ").toSInventoryItem().setCanClick(false).setClickEvent {
+                    isShaped = false
+                    setItem(22,item)
+                })
+            })
+        }
 
         setItem(4,createInputItem(SItem(Material.LIGHT_BLUE_CONCRETE).setDisplayName("§bクラフト権限変更").setLore(listOf("§a権限:${perm}")).toSInventoryItem(),String::class.java,"§a権限名を入れてください") { str, p ->
             perm = str
             p.sendMessage("§b" + str + "に変更しました")
         })
 
-        setItem(44,createInputItem(SItem(Material.WRITABLE_BOOK).setDisplayName("§a保存"),String::class.java,"内部名を入力してください",ClickType.LEFT,true) { str, p ->
-            if (save(str)){
-                p.sendMessage("§a保存に成功しました")
-            } else {
-                p.sendMessage("§c完成品のアイテムが存在しません")
-                open(p)
+        setItem(44,createInputItem(SItem(Material.WRITABLE_BOOK).setDisplayName("§a保存"),String::class.java,"カテゴリー名を入力してください",
+            ClickType.LEFT,true) { category, p ->
+            Man10Crafting.sInput.sendInputCUI(p,String::class.java,"内部名を入力してください") { str ->
+                if (save(str,category)){
+                    p.sendMessage("§a保存に成功しました")
+                } else {
+                    p.sendMessage("§c完成品のアイテムが存在しません")
+                    open(p)
+                }
             }
         })
 
         return true
     }
 
-    fun save(namespace: String): Boolean {
+    fun save(namespace: String, category: String): Boolean {
         val result = getItem(24)?:return false
+
+        listOf(10,11,12,19,20,21,28,29,30).forEach {
+            inv.getItem(it)?.amount = 1
+        }
 
 
         if (isShaped){
             val recipeData = RecipeData()
             recipeData.namespace = namespace
+            recipeData.category = category
             recipeData.type = RecipeData.Type.SHAPED
             recipeData.permission = perm
             recipeData.result = result
@@ -88,7 +114,6 @@ class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless"
                         builder.append(items[item]!!.toString())
                     }
                 }
-                Bukkit.broadcastMessage(builder.toString())
                 return builder.toString()
             }
 
@@ -102,6 +127,7 @@ class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless"
         } else {
             val recipeData = RecipeData()
             recipeData.namespace = namespace
+            recipeData.category = category
             recipeData.type = RecipeData.Type.SHAPELESS
             recipeData.permission = perm
             recipeData.result = result
