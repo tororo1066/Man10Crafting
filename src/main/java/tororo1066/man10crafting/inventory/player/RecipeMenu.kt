@@ -58,7 +58,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                             }
                         }
 
-                        setItem(23,data.type.material)
+                        setItem(23,SInventoryItem(data.type.material).setCanClick(false))
                         setItem(25,moveOtherRecipeItem(p,this,data.result))
 
                     }
@@ -83,7 +83,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                             setItem(loc,moveOtherRecipeItem(p,this,itemStack))
                         }
 
-                        setItem(23,data.type.material)
+                        setItem(23,SInventoryItem(data.type.material).setCanClick(false))
                         setItem(25,moveOtherRecipeItem(p,this,data.result))
 
                     }
@@ -91,14 +91,14 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     RecipeData.Type.FURNACE, RecipeData.Type.BLASTING, RecipeData.Type.SMOKING->{
                         setItem(11,moveOtherRecipeItem(p,this,data.singleMaterial))
                         setItem(20,white)
-                        setItem(13,SItem(data.type.material).setLore(listOf("§7調理時間 §e${data.furnaceTime} ticks","§7経験値量 §e${data.furnaceExp}")))
+                        setItem(13,SInventoryItem(data.type.material).setCanClick(false).setLore(listOf("§7調理時間 §e${data.furnaceTime} ticks","§7経験値量 §e${data.furnaceExp}")))
                         setItem(24,moveOtherRecipeItem(p,this,data.result))
                     }
 
                     RecipeData.Type.SMITHING->{
                         setItem(19,moveOtherRecipeItem(p,this,data.singleMaterial))
                         setItem(21,moveOtherRecipeItem(p,this,data.smithingMaterial))
-                        setItem(23,data.type.material)
+                        setItem(23,SInventoryItem(data.type.material).setCanClick(false))
                         setItem(25,moveOtherRecipeItem(p,this,data.result))
                     }
                 }

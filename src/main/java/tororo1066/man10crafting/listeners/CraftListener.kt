@@ -1,15 +1,10 @@
 package tororo1066.man10crafting.listeners
 
-import org.bukkit.Bukkit
 import org.bukkit.Keyed
 import org.bukkit.Material
-import org.bukkit.block.BlastFurnace
-import org.bukkit.block.Furnace
 import org.bukkit.entity.Player
 import org.bukkit.event.EventPriority
-import org.bukkit.event.block.BlockCookEvent
 import org.bukkit.event.inventory.CraftItemEvent
-import org.bukkit.event.inventory.FurnaceBurnEvent
 import org.bukkit.event.inventory.FurnaceSmeltEvent
 import org.bukkit.event.inventory.PrepareItemCraftEvent
 import org.bukkit.inventory.ItemStack

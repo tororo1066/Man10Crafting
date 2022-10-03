@@ -82,7 +82,9 @@ class RecipeData {
             }
             Type.SHAPELESS->{
                 val shapeless = ShapelessRecipe(namespace,result)
-                shapeless.ingredientList.addAll(shapelessMaterials)
+                shapelessMaterials.forEach {
+                    shapeless.addIngredient(it)
+                }
                 shapeless
             }
             Type.FURNACE->{
