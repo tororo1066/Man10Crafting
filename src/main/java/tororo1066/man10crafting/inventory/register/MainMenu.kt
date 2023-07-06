@@ -11,6 +11,10 @@ import tororo1066.tororopluginapi.sInventory.SInventoryItem
 
 class MainMenu: SInventory(Man10Crafting.plugin,"MainMenu",5) {
 
+    init {
+        registerClickSound()
+    }
+
     override fun renderMenu(): Boolean {
         setItems(0..44, SInventoryItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE).setCanClick(false))
 
@@ -32,6 +36,10 @@ class MainMenu: SInventory(Man10Crafting.plugin,"MainMenu",5) {
 
         setItem(14, SInventoryItem(Material.SMITHING_TABLE).setCanClick(false).setClickEvent {
             moveChildInventory(SmithingRegister(),it.whoClicked as Player)
+        })
+
+        setItem(32, SInventoryItem(Material.STONECUTTER).setCanClick(false).setClickEvent {
+            moveChildInventory(StoneCuttingRegister(),it.whoClicked as Player)
         })
 
         setItem(44, SInventoryItem(Material.WRITABLE_BOOK).setDisplayName("§eレシピを編集する").setCanClick(false).setClickEvent {

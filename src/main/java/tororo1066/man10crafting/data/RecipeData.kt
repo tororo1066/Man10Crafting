@@ -26,9 +26,11 @@ class RecipeData {
     var permission = ""
     var enabled = true
 
-    private var materialChars: String? = null
-
     private lateinit var recipe: Recipe
+
+    var returnBottle = true
+    var command = ""
+    var index = Int.MAX_VALUE
 
     companion object{
         fun loadFromYml(category: String, id: String): RecipeData {
@@ -44,7 +46,6 @@ class RecipeData {
                         recipe.materials[it.toCharArray()[0]] = section.getItemStack(it)!!
                     }
                     recipe.shape.addAll(yml.getStringList("shape"))
-
                 }
                 Type.SHAPELESS->{
                     @Suppress("UNCHECKED_CAST")
@@ -59,10 +60,16 @@ class RecipeData {
                     recipe.singleMaterial = yml.getItemStack("material")!!
                     recipe.smithingMaterial = yml.getItemStack("smithMaterial")!!
                 }
+                Type.STONECUTTING->{
+                    recipe.singleMaterial = yml.getItemStack("material")!!
+                }
             }
             recipe.result = yml.getItemStack("result")!!
             recipe.permission = yml.getString("permission","")!!
             recipe.enabled = yml.getBoolean("enabled",true)
+            recipe.returnBottle = yml.getBoolean("returnBottle")
+            recipe.command = yml.getString("command","")!!
+            recipe.index = yml.getInt("index",Int.MAX_VALUE)
 
             return recipe
         }
@@ -73,7 +80,6 @@ class RecipeData {
         val recipe: Recipe = when(type){
             Type.SHAPED->{
                 val shaped = ShapedRecipe(namespace,result)
-                materialChars = shape.joinToString("")
                 shaped.shape(shape[0],shape[1],shape[2])
                 materials.forEach {
                     shaped.setIngredient(it.key,it.value)
@@ -98,6 +104,9 @@ class RecipeData {
             }
             Type.SMITHING->{
                 SmithingRecipe(namespace,result,RecipeChoice.ExactChoice(singleMaterial),RecipeChoice.ExactChoice(smithingMaterial))
+            }
+            Type.STONECUTTING->{
+                StonecuttingRecipe(namespace,result,RecipeChoice.ExactChoice(singleMaterial))
             }
 
         }
@@ -132,10 +141,25 @@ class RecipeData {
                 config.set("material",singleMaterial)
                 config.set("smithMaterial",smithingMaterial)
             }
+            Type.STONECUTTING->{
+                config.set("material",singleMaterial)
+            }
         }
 
         if (permission.isNotBlank()){
             config.set("permission",permission)
+        }
+
+        if (returnBottle){
+            config.set("returnBottle",true)
+        }
+
+        if (command.isNotBlank()){
+            config.set("command",command)
+        }
+
+        if (index != Int.MAX_VALUE){
+            config.set("index",index)
         }
 
         config.set("enabled",enabled)
@@ -172,6 +196,7 @@ class RecipeData {
         FURNACE(Material.FURNACE),
         SMOKING(Material.SMOKER),
         BLASTING(Material.BLAST_FURNACE),
-        SMITHING(Material.SMITHING_TABLE)
+        SMITHING(Material.SMITHING_TABLE),
+        STONECUTTING(Material.STONECUTTER)
     }
 }

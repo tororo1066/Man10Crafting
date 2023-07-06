@@ -20,12 +20,12 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.17.1-R0.1-SNAPSHOT'
+    compileOnly 'io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT'
     api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    api 'com.github.tororo1066.TororoPluginAPI:TororoPluginAPI:9e06b14aa6'
+    api 'com.github.tororo1066.TororoPluginAPI:TororoPluginAPI:eed442b9f6'
 }
 
-def targetJavaVersion = 16
+def targetJavaVersion = 17
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion

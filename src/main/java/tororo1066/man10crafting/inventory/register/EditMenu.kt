@@ -1,7 +1,10 @@
 package tororo1066.man10crafting.inventory.register
 
+import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 import tororo1066.man10crafting.Man10Crafting
 import tororo1066.man10crafting.data.RecipeData
 import tororo1066.man10crafting.inventory.register.furnace.BlastingRegister
@@ -14,16 +17,25 @@ import tororo1066.tororopluginapi.sInventory.SInventoryItem
 
 class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
 
+    init {
+        registerClickSound()
+    }
+
     override fun renderMenu(): Boolean {
         val items = LinkedHashMap<String,ArrayList<SInventoryItem>>()
-        Man10Crafting.recipes.forEach { (key, data) ->
-            val item = SInventoryItem(data.result).addLore(listOf("§f§l[${if (data.enabled) "§a§lEnabled" else "§c§lDisabled"}§f§l]","§eクリックで編集","§eシフトクリックで有効切替")).setCanClick(false).setClickEvent {
+        Man10Crafting.recipes.entries.sortedBy { it.value.index }.forEach { (key, data) ->
+            val item = SInventoryItem(data.result).addLore(listOf("§f§l[${if (data.enabled) "§a§lEnabled" else "§c§lDisabled"}§f§l]","§a優先度:${data.index}","§7${key}","§eクリックで編集","§6シフトクリックで有効切替","§cシフト右クリックで削除")).setCanClick(false).setClickEvent {
                 if (it.click.isShiftClick){
+                    if (it.click == ClickType.SHIFT_RIGHT){
+                        Bukkit.removeRecipe(NamespacedKey(Man10Crafting.plugin,key))
+                        Man10Crafting.recipes.remove(key)
+                        allRenderMenu()
+                        return@setClickEvent
+                    }
                     val syncData = Man10Crafting.recipes[key]!!
                     syncData.enabled = !syncData.enabled
                     syncData.saveConfig()
-                    renderMenu()
-                    afterRenderMenu()
+                    allRenderMenu()
                 } else {
                     moveChildInventory(editMenu(data),it.whoClicked as Player)
                 }
@@ -53,6 +65,9 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : NormalCraftRegister(){
                         init {
                             isShaped = true
+                            returnBottle = data.returnBottle
+                            perm = data.permission
+                            command = data.command
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
@@ -65,6 +80,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                                     }
                                 }
                             }
+                            setItem(24,data.result)
                             setItem(43,saveItem().setClickEvent {
                                 val p = it.whoClicked as Player
                                 if (save(data.namespace,data.category)){
@@ -85,6 +101,9 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : NormalCraftRegister(){
                         init {
                             isShaped = false
+                            returnBottle = data.returnBottle
+                            perm = data.permission
+                            command = data.command
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
@@ -103,6 +122,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                                 }
                                 setItem(loc,itemStack)
                             }
+                            setItem(24,data.result)
                             setItem(43,saveItem().setClickEvent {
                                 val p = it.whoClicked as Player
                                 if (save(data.namespace,data.category)){
@@ -204,6 +224,28 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                             setItem(19,data.singleMaterial)
                             setItem(22,data.smithingMaterial)
                             setItem(25,data.result)
+                            setItem(43,saveItem().setClickEvent {
+                                val p = it.whoClicked as Player
+                                if (save(data.namespace,data.category)){
+                                    p.sendMessage("§a保存に成功しました")
+                                    p.closeInventory()
+                                } else {
+                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
+                                }
+                            })
+                            return true
+                        }
+                    }
+
+                    inv
+                }
+
+                RecipeData.Type.STONECUTTING-> {
+                    val inv = object : StoneCuttingRegister(){
+                        override fun renderMenu(): Boolean {
+                            super.renderMenu()
+                            setItem(20,data.singleMaterial)
+                            setItem(24,data.result)
                             setItem(43,saveItem().setClickEvent {
                                 val p = it.whoClicked as Player
                                 if (save(data.namespace,data.category)){

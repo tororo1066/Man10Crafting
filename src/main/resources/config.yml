@@ -1,1 +1,7 @@
 defaultLanguage: ja_jp
+mysql:
+  host: localhost
+  pass: pass
+  user: root
+  port: 3306
+  db: mcraft
