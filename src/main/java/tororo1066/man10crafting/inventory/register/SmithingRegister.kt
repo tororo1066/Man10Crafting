@@ -53,6 +53,7 @@ open class SmithingRegister: SInventory(Man10Crafting.plugin,"§5Smithing",5) {
         val smithingMaterial = getItem(22)?:return false
         material.amount = 1
         smithingMaterial.amount = 1
+        if (material.isSimilar(smithingMaterial))return false
         val recipeData = RecipeData()
         recipeData.type = RecipeData.Type.SMITHING
         recipeData.singleMaterial = material
