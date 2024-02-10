@@ -3,12 +3,14 @@ package tororo1066.man10crafting.listeners
 import org.bukkit.Bukkit
 import org.bukkit.Keyed
 import org.bukkit.Material
+import org.bukkit.block.BrewingStand
 import org.bukkit.entity.Player
 import org.bukkit.event.EventPriority
+import org.bukkit.event.block.BrewingStartEvent
 import org.bukkit.event.inventory.*
-import org.bukkit.inventory.CraftingInventory
-import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.*
 import tororo1066.man10crafting.Man10Crafting
+import tororo1066.man10crafting.data.RecipeData
 import tororo1066.tororopluginapi.SJavaPlugin
 import tororo1066.tororopluginapi.annotation.SEventHandler
 import tororo1066.tororopluginapi.utils.LocType
@@ -31,6 +33,7 @@ class CraftListener {
 
     @SEventHandler(EventPriority.LOWEST)
     fun event(e: CraftItemEvent){
+        if (e.isCancelled)return
         val eventRecipe = e.recipe
         if (eventRecipe !is Keyed)return
         val namespacedKey = eventRecipe.key
@@ -63,11 +66,12 @@ class CraftListener {
                 if (matrixAmount < amount) amount = matrixAmount
             }
         }
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${amount})") {}
+        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${amount},now())") {}
     }
 
     @SEventHandler(EventPriority.LOWEST)
     fun event(e: FurnaceSmeltEvent){
+        if (e.isCancelled)return
         val eventRecipe = e.recipe?:return
         if (eventRecipe.key.namespace != "man10crafting")return
         val recipe = Man10Crafting.recipes[eventRecipe.key.key]?:return
@@ -76,7 +80,7 @@ class CraftListener {
             return
         }
 
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount) values('${recipe.type.name}','none','none','${e.block.location.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',1)") {}
+        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','none','none','${e.block.location.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',1,now())") {}
     }
 
     @SEventHandler(EventPriority.LOWEST)
@@ -95,6 +99,7 @@ class CraftListener {
 
     @SEventHandler(EventPriority.LOWEST)
     fun event(e: SmithItemEvent){
+        if (e.isCancelled)return
         val eventRecipe = e.inventory.recipe?:return
         if (eventRecipe !is Keyed)return
         val namespacedKey = eventRecipe.key
@@ -108,6 +113,65 @@ class CraftListener {
             e.inventory.result = recipe.result
         }
 
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${min(e.inventory.inputEquipment?.amount?:0,e.inventory.inputMineral?.amount?:0)})") {}
+        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${min(e.inventory.inputEquipment?.amount?:0,e.inventory.inputMineral?.amount?:0)},now())") {}
+    }
+
+    @SEventHandler(EventPriority.LOWEST)
+    fun event(e: InventoryClickEvent){
+        if (e.isCancelled)return
+        val item = e.currentItem?:return
+        if (item.amount <= item.maxStackSize)return
+        val inv = e.clickedInventory?:return
+        when(inv){
+            is CraftingInventory ->{
+                if (e.slot !in 1..9)return
+                e.isCancelled = true
+            }
+
+            is FurnaceInventory ->{
+                if (e.slot != 0)return
+                e.isCancelled = true
+            }
+
+            is SmithingInventory ->{
+                if (e.slot !in 0..1)return
+                e.isCancelled = true
+            }
+
+            is StonecutterInventory ->{
+                if (e.slot != 0)return
+                e.isCancelled = true
+            }
+        }
+    }
+
+    @SEventHandler(EventPriority.LOWEST)
+    fun event(e: BrewingStartEvent){
+        val ingredient = e.source
+        val stand = e.block.state as BrewingStand
+        var maxBrewingTime = -1
+        (0..2).forEach { index ->
+            val item = stand.inventory.getItem(index)?:return@forEach
+            val recipe = Man10Crafting.recipes.entries.find {
+                it.value.type == RecipeData.Type.BREWING && it.value.potionInput == item && it.value.singleMaterial == ingredient
+            }?.value?:return@forEach
+            maxBrewingTime = maxBrewingTime.coerceAtLeast(recipe.brewingTime)
+        }
+        if (maxBrewingTime != -1){
+            e.totalBrewTime = maxBrewingTime
+        }
+    }
+
+    @SEventHandler(EventPriority.LOWEST)
+    fun event(e: BrewEvent){
+        if (e.isCancelled)return
+
+        (0..2).forEach { index ->
+            val item = e.contents.getItem(index)?:return@forEach
+            val recipe = Man10Crafting.recipes.entries.find {
+                it.value.type == RecipeData.Type.BREWING && it.value.potionInput == item && it.value.singleMaterial == e.contents.ingredient
+            }?.value?:return@forEach
+            SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','none','none','${e.contents.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',1,now())") {}
+        }
     }
 }

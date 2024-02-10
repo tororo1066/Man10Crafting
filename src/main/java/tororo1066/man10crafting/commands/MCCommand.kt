@@ -22,6 +22,16 @@ class MCCommand: SCommand("mcraft") {
     val register = command().addNeedPermission("mcraft.op").addArg(SCommandArg().addAllowString("register")).setPlayerExecutor { MainMenu().open(it.sender) }
 
     @SCommandBody
+    val getResultItem = command().addNeedPermission("mcraft.op")
+            .addArg(SCommandArg("giveResultItem"))
+            .addArg(SCommandArg(Man10Crafting.recipes.keys))
+            .setPlayerExecutor {
+                val recipe = Man10Crafting.recipes[it.args[1]]!!
+                it.sender.inventory.addItem(recipe.result)
+                it.sender.sendPlainMessage(Man10Crafting.prefix + "§aレシピの結果アイテムを付与しました")
+            }
+
+    @SCommandBody
     val getCraftAmount = command().addNeedPermission("mcraft.op").addArg(SCommandArg("log")).addArg(SCommandArg("item")).addArg(
         SCommandArg(Man10Crafting.recipes.keys)).setNormalExecutor {
         val recipe = Man10Crafting.recipes[it.args[2]]!!
@@ -41,6 +51,22 @@ class MCCommand: SCommand("mcraft") {
             it.sender.sendPlainMessage(Man10Crafting.prefix + "§f§l" + p.name + "§aの" + recipe.result.itemMeta.displayName + "§aの合計作成回数:§6" + rs.getNullableObject("sum(amount)") as? BigDecimal)
         }
     }
+
+    @SCommandBody
+    val enabledAutoCraft = command().addNeedPermission("mcraft.op").addArg(SCommandArg("enabledAutoCraft"))
+            .addArg(SCommandArg(SCommandArgType.BOOLEAN)).setNormalExecutor {
+                Man10Crafting.enabledAutoCraft = it.args[1].toBoolean()
+                Man10Crafting.plugin.config.set("enabledAutoCraft",Man10Crafting.enabledAutoCraft)
+                Man10Crafting.plugin.saveConfig()
+                it.sender.sendPlainMessage(Man10Crafting.prefix + "§a自動クラフトを${if (Man10Crafting.enabledAutoCraft) "有効" else "無効"}にしました")
+    }
+
+    @SCommandBody
+    val reload = command().addNeedPermission("mcraft.op").addArg(SCommandArg("reload"))
+        .setNormalExecutor {
+            Man10Crafting.plugin.reloadPluginConfig()
+            it.sender.sendPlainMessage(Man10Crafting.prefix + "§a再読み込みしました")
+        }
 
     init {
         registerSLangCommand(Man10Crafting.plugin,"mcraft.op")

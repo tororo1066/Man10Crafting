@@ -6,10 +6,13 @@ import org.bukkit.block.BlastFurnace
 import org.bukkit.block.Furnace
 import org.bukkit.block.Smoker
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.inventory.CraftingInventory
+import org.bukkit.inventory.FurnaceInventory
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.StonecutterInventory
+import smithcrafting.base.SmithBase
 import tororo1066.man10crafting.Man10Crafting
 import tororo1066.man10crafting.data.RecipeData
 import tororo1066.tororopluginapi.defaultMenus.CategorySInventory
@@ -17,6 +20,7 @@ import tororo1066.tororopluginapi.defaultMenus.PagedSInventory
 import tororo1066.tororopluginapi.lang.SLang.Companion.translate
 import tororo1066.tororopluginapi.sInventory.SInventory
 import tororo1066.tororopluginapi.sInventory.SInventoryItem
+import java.util.function.Consumer
 
 class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man10Crafting.prefix}§6レシピ一覧") {
 
@@ -110,10 +114,22 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     }
 
                     RecipeData.Type.SMITHING->{
-                        setItem(19,moveOtherRecipeItem(p,inv,data.singleMaterial))
-                        setItem(21,moveOtherRecipeItem(p,inv,data.smithingMaterial))
-                        setItem(23,SInventoryItem(data.type.material).setCanClick(false))
-                        setItem(25,moveOtherRecipeItem(p,inv,data.result))
+                        Man10Crafting.smithUtil.viewInventory(Man10Crafting.plugin, p, SmithBase.SaveData(
+                            data.namespace,
+                            data.category,
+                            data.index,
+                            data.singleMaterial,
+                            data.smithingMaterial,
+                            data.smithingAdditionalMaterial,
+                            data.result,
+                            data.smithingCopyNbt,
+                            data.smithingTransform
+                        )){ p, inv, item -> moveOtherRecipeItem(p, inv, item) }
+                            .apply {
+                                allRenderMenu(p)
+                            }.getSInvItems().forEach { (index, item) ->
+                            setItem(index, item)
+                        }
                     }
 
                     RecipeData.Type.STONECUTTING->{
@@ -121,6 +137,15 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                         setItem(24,moveOtherRecipeItem(p,inv,data.result))
                         setItems(29..33, SInventoryItem(Material.GREEN_STAINED_GLASS_PANE).setDisplayName(" ").setCanClick(false))
                         setItem(31, SInventoryItem(Material.STONECUTTER).setCanClick(false))
+                    }
+
+                    RecipeData.Type.BREWING->{
+                        setItem(10,SInventoryItem(Material.NETHER_WART).setDisplayName("§a素材").setCanClick(false))
+                        setItem(19,moveOtherRecipeItem(p,this,data.singleMaterial))
+                        setItem(12,SInventoryItem(Material.POTION).setDisplayName("§d元").setCanClick(false))
+                        setItem(21,moveOtherRecipeItem(p,this,data.potionInput))
+                        setItem(23,SInventoryItem(Material.BREWING_STAND).setCanClick(false))
+                        setItem(25,moveOtherRecipeItem(p,this,data.result))
                     }
                 }
 
@@ -152,6 +177,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                             it.value.singleMaterial.isSimilar(item)
                         }
                         RecipeData.Type.SMITHING-> it.value.singleMaterial.isSimilar(item) || it.value.smithingMaterial.isSimilar(item)
+                        RecipeData.Type.BREWING-> it.value.singleMaterial.isSimilar(item) || it.value.potionInput.isSimilar(item)
                     }
                 }
             } else {
@@ -235,6 +261,9 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
 //                contents.find { it?.isSimilar(recipe.singleMaterial) == true }?:return false
 //                contents.find { it?.isSimilar(recipe.smithingMaterial) == true }?:return false
 //                return true
+                }
+                RecipeData.Type.BREWING ->{
+                    return false
                 }
             }
         }
@@ -380,6 +409,10 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
 //                    return 1
 //                }
                 }
+
+                RecipeData.Type.BREWING ->{
+                    return 0
+                }
             }
 
             return 0
@@ -389,12 +422,26 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
             val amount = creatableAmount(p, recipe, isShiftClick)
             if (amount == 0)return false
 
+            fun returnItem(itemStack: ItemStack){
+                val addItem = p.inventory.addItem(itemStack)
+                if (addItem.isNotEmpty()){
+                    addItem.forEach { item ->
+                        p.world.dropItem(p.location, item.value) {
+                            it.pickupDelay = 0
+                            it.owner = p.uniqueId
+                            it.setCanMobPickup(false)
+                        }
+                    }
+                }
+            }
+
             when(recipe.type){
                 RecipeData.Type.SHAPED-> {
                     val tableInv = p.openWorkbench(p.location, true)!!.topInventory as CraftingInventory
                     recipe.shape.stream().flatMap { it.toCharArray().toList().stream() }.toList().forEachIndexed { i, char ->
                         val item = (recipe.materials[char]?:return@forEachIndexed).clone()
                         if (!takeItem(p.inventory, item, amount))return false
+                        tableInv.getItem(i+1)?.let { returnItem(it) }
                         tableInv.setItem(i+1, item.apply { this.amount = amount })
                     }
                 }
@@ -404,6 +451,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     recipe.shapelessMaterials.forEachIndexed { i, item ->
                         val shapelessMaterial = item.clone()
                         if (!takeItem(p.inventory, shapelessMaterial, amount))return false
+                        tableInv.getItem(i+1)?.let { returnItem(it) }
                         tableInv.setItem(i+1, shapelessMaterial.apply { this.amount = amount })
                     }
                 }
@@ -413,6 +461,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     p.openInventory(furnace.inventory)
                     val material = recipe.singleMaterial.clone()
                     if (!takeItem(p.inventory, material, amount))return false
+                    furnace.inventory.smelting?.let { returnItem(it) }
                     furnace.inventory.smelting = material.apply { this.amount = amount }
                 }
 
@@ -421,6 +470,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     p.openInventory(furnace.inventory)
                     val material = recipe.singleMaterial.clone()
                     if (!takeItem(p.inventory, material, amount))return false
+                    furnace.inventory.smelting?.let { returnItem(it) }
                     furnace.inventory.smelting = material.apply { this.amount = amount }
                 }
 
@@ -429,6 +479,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     p.openInventory(furnace.inventory)
                     val material = recipe.singleMaterial.clone()
                     if (!takeItem(p.inventory, material, amount))return false
+                    furnace.inventory.smelting?.let { returnItem(it) }
                     furnace.inventory.smelting = material.apply { this.amount = amount }
                 }
 
@@ -440,7 +491,12 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     val stoneCutter = p.openStonecutter(p.location, true)!!.topInventory as StonecutterInventory
                     val material = recipe.singleMaterial.clone()
                     if (!takeItem(p.inventory, material, amount))return false
+                    stoneCutter.inputItem?.let { returnItem(it) }
                     stoneCutter.inputItem = material.apply { this.amount = amount }
+                }
+
+                RecipeData.Type.BREWING-> {
+                    return true
                 }
             }
 

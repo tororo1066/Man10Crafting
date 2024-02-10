@@ -1,5 +1,6 @@
 package tororo1066.man10crafting
 
+import smithcrafting.base.SmithBase
 import org.bukkit.Bukkit
 import org.bukkit.Keyed
 import tororo1066.man10crafting.commands.MCCommand
@@ -13,34 +14,18 @@ import java.io.File
 
 class Man10Crafting: SJavaPlugin(UseOption.MySQL) {
 
-    companion object{
+    companion object {
         lateinit var plugin: Man10Crafting
         val recipes = HashMap<String,RecipeData>()
         lateinit var sConfig: SConfig
         lateinit var sInput: SInput
         lateinit var sLang: SLang
+        lateinit var smithUtil: SmithBase
+        var enabledAutoCraft = true
         val prefix = SStr("&c[&bMan10Crafting&c]&r").toString()
     }
 
-    override fun onStart() {
-        saveDefaultConfig()
-        plugin = this
-        sLang = SLang(this)
-        sConfig = SConfig(this)
-        sInput = SInput(this)
-
-        mysql.callbackExecute("CREATE TABLE IF NOT EXISTS `craft_log` (\n" +
-                "\t`id` INT(10) NOT NULL AUTO_INCREMENT,\n" +
-                "\t`type` VARCHAR(10) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
-                "\t`uuid` VARCHAR(36) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
-                "\t`mcid` VARCHAR(16) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
-                "\t`location` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
-                "\t`recipe` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
-                "\t`amount` INT(10) NULL DEFAULT NULL,\n" +
-                "\tPRIMARY KEY (`id`) USING BTREE\n" +
-                ")\n" +
-                ";\n") {}
-
+    fun reloadPluginConfig(){
         Bukkit.recipeIterator().forEach {
             if (it !is Keyed)return@forEach
             if (it.key.key == "man10crafting"){
@@ -56,6 +41,32 @@ class Man10Crafting: SJavaPlugin(UseOption.MySQL) {
             }
         }
 
+        enabledAutoCraft = config.getBoolean("enabledAutoCraft",true)
+
         MCCommand()
+    }
+
+    override fun onStart() {
+        saveDefaultConfig()
+        plugin = this
+        sLang = SLang(this)
+        sConfig = SConfig(this)
+        sInput = SInput(this)
+        smithUtil = SmithBase.getInstance()
+
+        mysql.callbackExecute("CREATE TABLE `craft_log` (\n" +
+                "\t`id` INT(10) NOT NULL AUTO_INCREMENT,\n" +
+                "\t`type` VARCHAR(10) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                "\t`uuid` VARCHAR(36) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                "\t`mcid` VARCHAR(16) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                "\t`location` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                "\t`recipe` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                "\t`amount` INT(10) NULL DEFAULT NULL,\n" +
+                "\t`date` DATETIME NULL DEFAULT NULL,\n" +
+                "\tPRIMARY KEY (`id`) USING BTREE\n" +
+                ")" +
+                ";\n") {}
+
+        reloadPluginConfig()
     }
 }

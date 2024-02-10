@@ -36,7 +36,7 @@ open class StoneCuttingRegister: SInventory(Man10Crafting.plugin,"§aStoneCuttin
 
         setItem(44,createInputItem(
             SItem(Material.WRITABLE_BOOK).setDisplayName("§a保存"),String::class.java,"カテゴリー名を入力してください",
-            ClickType.LEFT,true) { category, p ->
+            invOpenCancel = true) { category, p ->
             Man10Crafting.sInput.sendInputCUI(p,String::class.java,"内部名を入力してください") { str ->
                 if (save(str,category)){
                     p.sendMessage("§a保存に成功しました")

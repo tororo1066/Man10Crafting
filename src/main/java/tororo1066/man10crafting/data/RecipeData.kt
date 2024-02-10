@@ -1,5 +1,6 @@
 package tororo1066.man10crafting.data
 
+import io.papermc.paper.potion.PotionMix
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -7,6 +8,7 @@ import org.bukkit.entity.Player
 import org.bukkit.event.inventory.PrepareItemCraftEvent
 import org.bukkit.inventory.*
 import tororo1066.man10crafting.Man10Crafting
+import tororo1066.tororopluginapi.SStr
 import java.io.File
 
 class RecipeData {
@@ -21,12 +23,21 @@ class RecipeData {
     lateinit var singleMaterial: ItemStack
     var furnaceExp = 0f
     var furnaceTime = 0
+
     lateinit var smithingMaterial: ItemStack
+    var smithingAdditionalMaterial: ItemStack? = null
+    var smithingTransform = true
+    var smithingCopyNbt = false
+
+    lateinit var potionInput: ItemStack
 
     var permission = ""
     var enabled = true
 
     private lateinit var recipe: Recipe
+
+    private lateinit var potionRecipe: PotionMix
+    var brewingTime = -1
 
     var returnBottle = true
     var command = ""
@@ -59,9 +70,17 @@ class RecipeData {
                 Type.SMITHING->{
                     recipe.singleMaterial = yml.getItemStack("material")!!
                     recipe.smithingMaterial = yml.getItemStack("smithMaterial")!!
+                    recipe.smithingAdditionalMaterial = yml.getItemStack("additionalMaterial")
+                    recipe.smithingTransform = yml.getBoolean("transform",true)
+                    recipe.smithingCopyNbt = yml.getBoolean("copyNbt",false)
                 }
                 Type.STONECUTTING->{
                     recipe.singleMaterial = yml.getItemStack("material")!!
+                }
+                Type.BREWING->{
+                    recipe.potionInput = yml.getItemStack("input")!!
+                    recipe.singleMaterial = yml.getItemStack("material")!!
+                    recipe.brewingTime = yml.getInt("brewingTime",-1)
                 }
             }
             recipe.result = yml.getItemStack("result")!!
@@ -103,12 +122,16 @@ class RecipeData {
                 BlastingRecipe(namespace,result,RecipeChoice.ExactChoice(singleMaterial),furnaceExp,furnaceTime)
             }
             Type.SMITHING->{
-                SmithingRecipe(namespace,result,RecipeChoice.ExactChoice(singleMaterial),RecipeChoice.ExactChoice(smithingMaterial))
+                Man10Crafting.smithUtil.create(namespace,singleMaterial,smithingMaterial,smithingAdditionalMaterial,result,smithingTransform,smithingCopyNbt)
             }
             Type.STONECUTTING->{
                 StonecuttingRecipe(namespace,result,RecipeChoice.ExactChoice(singleMaterial))
             }
 
+            Type.BREWING->{
+                potionRecipe = PotionMix(namespace,result,RecipeChoice.ExactChoice(potionInput),RecipeChoice.ExactChoice(singleMaterial))
+                return
+            }
         }
         this.recipe = recipe
     }
@@ -140,9 +163,19 @@ class RecipeData {
             Type.SMITHING->{
                 config.set("material",singleMaterial)
                 config.set("smithMaterial",smithingMaterial)
+                config.set("additionalMaterial",smithingAdditionalMaterial)
+                config.set("transform",smithingTransform)
+                config.set("copyNbt",smithingCopyNbt)
             }
             Type.STONECUTTING->{
                 config.set("material",singleMaterial)
+            }
+            Type.BREWING->{
+                config.set("input",potionInput)
+                config.set("material",singleMaterial)
+                if (brewingTime != -1) {
+                    config.set("brewingTime", brewingTime)
+                }
             }
         }
 
@@ -170,8 +203,19 @@ class RecipeData {
     }
 
     fun register(){
-        if (!::recipe.isInitialized){
+        if (type == Type.BREWING && !SStr.isPaper()) {
+            Man10Crafting.plugin.logger.warning("Brewing recipe is not supported in not paper server")
+            return
+        }
+        if (!::recipe.isInitialized || (type == Type.BREWING && !::potionRecipe.isInitialized)){
             create()
+        }
+        if (type == Type.BREWING) {
+            val namespacedKey = potionRecipe.key
+            Bukkit.getPotionBrewer().removePotionMix(namespacedKey)
+            Bukkit.getPotionBrewer().addPotionMix(potionRecipe)
+            Man10Crafting.recipes[namespace] = this
+            return
         }
         val namespacedKey = NamespacedKey(Man10Crafting.plugin,namespace)
         val defaultRecipe = Bukkit.getRecipe(namespacedKey)
@@ -197,6 +241,7 @@ class RecipeData {
         SMOKING(Material.SMOKER),
         BLASTING(Material.BLAST_FURNACE),
         SMITHING(Material.SMITHING_TABLE),
-        STONECUTTING(Material.STONECUTTER)
+        STONECUTTING(Material.STONECUTTER),
+        BREWING(Material.BREWING_STAND)
     }
 }

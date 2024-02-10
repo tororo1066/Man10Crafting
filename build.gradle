@@ -1,69 +1,100 @@
-plugins {
-    id 'java'
-    id 'org.jetbrains.kotlin.jvm' version '1.7.0'
+allprojects {
+    apply plugin: 'kotlin'
+    apply plugin: 'com.github.johnrengelman.shadow'
+    group = 'tororo1066'
+    version = '1.0-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+        maven {
+            name = 'papermc-repo'
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+        maven {
+            name = 'sonatype'
+            url = 'https://oss.sonatype.org/content/groups/public/'
+        }
+        maven {
+            url = uri('https://maven.pkg.github.com/tororo1066/TororoPluginAPI')
+            credentials {
+                username = System.getenv('GITHUB_USERNAME')
+                password = System.getenv('GITHUB_TOKEN')
+            }
+        }
+    }
+
+    dependencies {
+        api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+        api 'tororo1066:tororopluginapi:a1ab1cdc'
+    }
+
+    def targetJavaVersion = 17
+    java {
+        def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+        sourceCompatibility = javaVersion
+        targetCompatibility = javaVersion
+        if (JavaVersion.current() < javaVersion) {
+            toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+            options.release = targetJavaVersion
+        }
+    }
+
+    processResources {
+        def props = [version: version]
+        inputs.properties props
+        filteringCharset 'UTF-8'
+        filesMatching('plugin.yml') {
+            expand props
+        }
+    }
+    compileKotlin {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+    }
+    compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+    }
+    jar {
+        from {
+            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            configurations.runtimeClasspath.collect {
+                it.isDirectory() ? it : zipTree(it)
+            }
+        }
+    }
 }
 
-group = 'tororo1066'
-version = '1.0-SNAPSHOT'
-
-repositories {
-    mavenCentral()
-    maven {
-        name = 'papermc-repo'
-        url = 'https://repo.papermc.io/repository/maven-public/'
+buildscript {
+    ext.kotlin_version = '1.7.20'
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
     }
-    maven {
-        name = 'sonatype'
-        url = 'https://oss.sonatype.org/content/groups/public/'
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'gradle.plugin.com.github.johnrengelman:shadow:7.1.2'
     }
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT'
-    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    api 'com.github.tororo1066.TororoPluginAPI:TororoPluginAPI:eed442b9f6'
+    compileOnly 'io.papermc.paper:paper-api:1.19.3-R0.1-SNAPSHOT'
+    implementation project(':SmithCrafting')
 }
 
-def targetJavaVersion = 17
-java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release = targetJavaVersion
-    }
-}
-
-processResources {
-    def props = [version: version]
-    inputs.properties props
-    filteringCharset 'UTF-8'
-    filesMatching('plugin.yml') {
-        expand props
-    }
-}
-compileKotlin {
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-}
-compileTestKotlin {
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-}
-jar {
-    from {
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-        configurations.runtimeClasspath.collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-    }
+shadowJar {
+    exclude("kotlin/**")
+    exclude("org/intellij/lang/annotations/**")
+    exclude("org/jetbrains/annotations/**")
+    relocate('kotlin', 'tororo1066.libs.kotlin')
+    relocate('org.jetbrains.kotlin', 'tororo1066.libs.kotlin.org.jetbrains.kotlin')
+    relocate('org.jetbrains.annotations', 'tororo1066.libs.kotlin.org.jetbrains.annotations')
+    archiveFileName.set("${project.name}-${project.version}.jar")
 }

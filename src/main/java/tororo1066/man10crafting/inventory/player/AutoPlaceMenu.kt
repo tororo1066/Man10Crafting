@@ -22,6 +22,7 @@ class AutoPlaceMenu(private val p: Player): LargeSInventory("${Man10Crafting.pre
             val item = SInventoryItem(data.result)
                 .setCanClick(false)
                 .setClickEvent {
+                    throughClose(p)
                     RecipeMenu.setRecipe(p, data, it.isShiftClick)
                 }
             items.add(item)

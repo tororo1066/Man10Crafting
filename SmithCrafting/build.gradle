@@ -1,0 +1,13 @@
+tasks {
+    jar {
+        dependsOn("base:build")
+        dependsOn("above_1_20:build")
+        dependsOn("below_1_20:build")
+    }
+}
+
+dependencies {
+    api project(':SmithCrafting:base')
+    api project(':SmithCrafting:above_1_20')
+    api project(':SmithCrafting:below_1_20')
+}

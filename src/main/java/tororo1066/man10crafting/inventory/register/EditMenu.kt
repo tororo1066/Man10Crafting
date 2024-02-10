@@ -1,5 +1,6 @@
 package tororo1066.man10crafting.inventory.register
 
+import smithcrafting.base.SmithBase
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -53,7 +54,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
         return true
     }
 
-    fun editMenu(data: RecipeData): SInventory {
+    private fun editMenu(data: RecipeData): SInventory {
 
         fun saveItem(): SInventoryItem {
             return SInventoryItem(Material.WRITABLE_BOOK).setDisplayName("§a上書き保存").setCanClick(false)
@@ -64,6 +65,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 RecipeData.Type.SHAPED-> {
                     val inv = object : NormalCraftRegister(){
                         init {
+                            index = data.index
                             isShaped = true
                             returnBottle = data.returnBottle
                             perm = data.permission
@@ -100,6 +102,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 RecipeData.Type.SHAPELESS-> {
                     val inv = object : NormalCraftRegister(){
                         init {
+                            index = data.index
                             isShaped = false
                             returnBottle = data.returnBottle
                             perm = data.permission
@@ -142,6 +145,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 RecipeData.Type.FURNACE-> {
                     val inv = object : FurnaceRegister(){
                         init {
+                            index = data.index
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
                         }
@@ -168,6 +172,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 RecipeData.Type.SMOKING-> {
                     val inv = object : SmokingRegister(){
                         init {
+                            index = data.index
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
                         }
@@ -194,6 +199,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 RecipeData.Type.BLASTING-> {
                     val inv = object : BlastingRegister(){
                         init {
+                            index = data.index
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
                         }
@@ -218,12 +224,50 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                 }
 
                 RecipeData.Type.SMITHING-> {
-                    val inv = object : SmithingRegister(){
+                    val inv = Man10Crafting.smithUtil.editInventory(
+                        Man10Crafting.plugin,
+                        Man10Crafting.sInput,
+                        SmithBase.SaveData(
+                            data.namespace,
+                            data.category,
+                            data.index,
+                            data.singleMaterial,
+                            data.smithingMaterial,
+                            data.smithingAdditionalMaterial,
+                            data.result,
+                            data.smithingCopyNbt,
+                            data.smithingTransform
+                        )
+                    ) { saveData ->
+                        val result = saveData.result
+                        val material = saveData.singleMaterial
+                        val smithingMaterial = saveData.smithingMaterial
+                        val additionalMaterial = saveData.additionalMaterial
+                        val recipeData = RecipeData()
+                        recipeData.type = RecipeData.Type.SMITHING
+                        recipeData.singleMaterial = material
+                        recipeData.smithingMaterial = smithingMaterial
+                        recipeData.result = result
+                        recipeData.smithingAdditionalMaterial = additionalMaterial
+
+                        recipeData.namespace = saveData.namespace
+                        recipeData.category = saveData.category
+                        recipeData.index = saveData.index
+                        recipeData.saveConfig()
+                        recipeData.register()
+
+                        return@editInventory true
+                    }
+
+                    inv
+                }
+
+                RecipeData.Type.STONECUTTING-> {
+                    val inv = object : StoneCuttingRegister(){
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
-                            setItem(19,data.singleMaterial)
-                            setItem(22,data.smithingMaterial)
-                            setItem(25,data.result)
+                            setItem(20,data.singleMaterial)
+                            setItem(24,data.result)
                             setItem(43,saveItem().setClickEvent {
                                 val p = it.whoClicked as Player
                                 if (save(data.namespace,data.category)){
@@ -240,12 +284,17 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     inv
                 }
 
-                RecipeData.Type.STONECUTTING-> {
-                    val inv = object : StoneCuttingRegister(){
+                RecipeData.Type.BREWING-> {
+                    val inv = object : BrewingRegister(){
+                        init {
+                            index = data.index
+                            brewingTime = data.brewingTime
+                        }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
-                            setItem(20,data.singleMaterial)
-                            setItem(24,data.result)
+                            setItem(19,data.singleMaterial)
+                            setItem(22,data.potionInput)
+                            setItem(25,data.result)
                             setItem(43,saveItem().setClickEvent {
                                 val p = it.whoClicked as Player
                                 if (save(data.namespace,data.category)){
