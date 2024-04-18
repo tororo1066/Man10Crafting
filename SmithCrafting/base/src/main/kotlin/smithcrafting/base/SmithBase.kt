@@ -4,6 +4,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.Recipe
+import org.bukkit.inventory.SmithingInventory
 import org.bukkit.plugin.java.JavaPlugin
 import tororo1066.tororopluginapi.SInput
 import tororo1066.tororopluginapi.otherUtils.UsefulUtility
@@ -38,6 +39,8 @@ interface SmithBase {
         val namespace: String,
         val category: String,
         val index: Int,
+        val registerIndex: Int?,
+        val hidden: Boolean,
         val singleMaterial: ItemStack,
         val smithingMaterial: ItemStack,
         val additionalMaterial: ItemStack?,

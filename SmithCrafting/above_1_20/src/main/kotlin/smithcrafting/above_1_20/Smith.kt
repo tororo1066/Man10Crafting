@@ -67,7 +67,7 @@ class Smith: SmithBase {
                 setItem(19, data.additionalMaterial?: ItemStack(Material.AIR))
 
                 setItem(43, SInventoryItem(Material.WRITABLE_BOOK).setDisplayName("§a上書き保存").setCanClick(false).setClickEvent {
-                    save(it.whoClicked as Player,data.namespace,data.category,data.index,data.copyNbt,data.transform,onSave)
+                    save(it.whoClicked as Player,data.namespace,data.category,data.index,data.registerIndex,data.hidden,data.copyNbt,data.transform,onSave)
                     it.whoClicked.closeInventory()
                 })
                 return true
@@ -119,6 +119,8 @@ class Smith: SmithBase {
         val onSave: (SmithBase.SaveData) -> Boolean
     ) : SInventory(plugin, "§5Smithing", 5) {
         var index = data?.index ?: Int.MAX_VALUE
+        var registerIndex = data?.registerIndex
+        var hidden = data?.hidden ?: false
         var copyNbt = data?.copyNbt ?: false
         var transform = data?.transform ?: false
 
@@ -147,17 +149,6 @@ class Smith: SmithBase {
                                 )
                             )
                             setItem(
-                                10,
-                                createInputItem(
-                                    SItem(Material.BOOK).setDisplayName("§6レシピブックで表示される優先度")
-                                        .addLore("§a優先度:${index}").addLore("§e数値が低いほど前に出てきます"),
-                                    Int::class.java,
-                                    "§a数値を入力してください"
-                                ) { int, p ->
-                                    index = int
-                                    p.sendMessage("§b" + int + "に変更しました")
-                                })
-                            setItem(
                                 11,
                                 SInventoryItem(Material.PAPER).setDisplayName("§dNBTを保持する")
                                     .addLore("§a現在の値: $copyNbt").setCanClick(false).setClickEvent { _ ->
@@ -171,6 +162,25 @@ class Smith: SmithBase {
                                         transform = !transform
                                         allRenderMenu()
                                     })
+                            setItem(13,createInputItem(SItem(Material.BOOK).setDisplayName("§6レシピブックの優先度")
+                                .addLore("§a優先度:${index}")
+                                .addLore("§e数値が低いほど前に表示されます"),Int::class.java,"§a数値を入力してください") { int, p ->
+                                index = int
+                                p.sendMessage("§b" + int + "に変更しました")
+                            })
+                            setItem(14, createNullableInputItem(SItem(Material.WRITTEN_BOOK).setDisplayName("§6レシピ登録の優先度")
+                                .addLore("§a優先度:${registerIndex}")
+                                .addLore("§e数値が低いほど先に登録されます")
+                                .addLore("nullでレシピブックの優先度と同じになります"), Int::class.java, "§a数値を入力してください") { int, p ->
+                                registerIndex = int
+                                p.sendPlainMessage("§b" + int + "に変更しました")
+                            })
+                            setItem(15, SInventoryItem(SItem(Material.CYAN_CONCRETE).setDisplayName("§6非表示設定"))
+                                .addLore("§a現在:${if (hidden) "非表示" else "表示"}")
+                                .setClickEvent {
+                                    hidden = !hidden
+                                    allRenderMenu()
+                                })
                             return true
                         }
                     }
@@ -182,7 +192,7 @@ class Smith: SmithBase {
                 invOpenCancel = true
             ) { category, p ->
                 sInput.sendInputCUI(p, String::class.java, "内部名を入力してください") { str ->
-                    save(p, str, category, index, copyNbt, transform, onSave)
+                    save(p, str, category, index, registerIndex, hidden, copyNbt, transform, onSave)
                 }
             })
             return true
@@ -190,7 +200,17 @@ class Smith: SmithBase {
     }
 
     companion object {
-        private fun SInventory.save(p: Player, namespace: String, category: String, index: Int, copyNbt: Boolean, transform: Boolean, onSave: (SmithBase.SaveData) -> Boolean) {
+        private fun SInventory.save(
+            p: Player,
+            namespace: String,
+            category: String,
+            index: Int,
+            registerIndex: Int?,
+            hidden: Boolean,
+            copyNbt: Boolean,
+            transform: Boolean,
+            onSave: (SmithBase.SaveData) -> Boolean
+        ) {
             val material = getItem(20)
             val smithingMaterial = getItem(21)
             val result = getItem(25)
@@ -205,6 +225,8 @@ class Smith: SmithBase {
                         namespace,
                         category,
                         index,
+                        registerIndex,
+                        hidden,
                         material,
                         smithingMaterial,
                         additionalMaterial,

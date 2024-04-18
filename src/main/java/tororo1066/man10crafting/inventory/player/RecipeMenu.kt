@@ -1,14 +1,11 @@
 package tororo1066.man10crafting.inventory.player
 
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.block.BlastFurnace
 import org.bukkit.block.Furnace
 import org.bukkit.block.Smoker
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.inventory.CraftingInventory
-import org.bukkit.inventory.FurnaceInventory
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.StonecutterInventory
@@ -20,7 +17,6 @@ import tororo1066.tororopluginapi.defaultMenus.PagedSInventory
 import tororo1066.tororopluginapi.lang.SLang.Companion.translate
 import tororo1066.tororopluginapi.sInventory.SInventory
 import tororo1066.tororopluginapi.sInventory.SInventoryItem
-import java.util.function.Consumer
 
 class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man10Crafting.prefix}§6レシピ一覧") {
 
@@ -31,7 +27,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
     }
 
     override fun renderMenu(): Boolean {
-        val filteredRecipes = Man10Crafting.recipes.filter { it.value.checkNeed(p) }.entries.sortedBy { it.value.index }
+        val filteredRecipes = Man10Crafting.recipes.filter { !it.value.hidden && it.value.checkNeed(p) }.entries.sortedBy { it.value.index }
         val items = LinkedHashMap<String,ArrayList<SInventoryItem>>()
         filteredRecipes.forEach { (_, data) ->
             val item = moveOtherRecipeItem(p, this, data.result)
@@ -118,6 +114,8 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                             data.namespace,
                             data.category,
                             data.index,
+                            data.registerIndex,
+                            data.hidden,
                             data.singleMaterial,
                             data.smithingMaterial,
                             data.smithingAdditionalMaterial,
@@ -169,7 +167,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
         return SInventoryItem(item).setCanClick(false).setClickEvent { e ->
             val recipe = if (e.click.isRightClick){
                 Man10Crafting.recipes.filter {
-                    if (!it.value.checkNeed(p))return@filter false
+                    if (!it.value.checkNeed(p) || it.value.hidden)return@filter false
                     when(it.value.type){
                         RecipeData.Type.SHAPELESS-> it.value.shapelessMaterials.any { any -> any.isSimilar(item) }
                         RecipeData.Type.SHAPED-> it.value.materials.values.any { any -> any.isSimilar(item) }
@@ -181,7 +179,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                     }
                 }
             } else {
-                Man10Crafting.recipes.filter { it.value.checkNeed(p) && it.value.result.isSimilar(item) }
+                Man10Crafting.recipes.filter { it.value.checkNeed(p) && !it.value.hidden && it.value.result.isSimilar(item) }
             }
             if (recipe.isEmpty())return@setClickEvent
             val pagedInv = object : PagedSInventory(Man10Crafting.plugin,
@@ -208,7 +206,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
         fun creatable(p: Player, recipe: RecipeData): Boolean {
             when(recipe.type){
                 RecipeData.Type.SHAPED ->{
-                    if ((p.getTargetBlockExact(5)?:return false).type != Material.CRAFTING_TABLE)return false
+                    if ((p.getTargetBlockExact(4)?:return false).type != Material.CRAFTING_TABLE)return false
                     val shapeToItems = recipe.shape.map { it.mapNotNull { map -> recipe.materials[map]?.clone() } }.stream().flatMap { it.stream() }.toList()
                     val contents = p.inventory.contents.clone().map { it?.clone() }.toMutableList()
                     var checked = true
@@ -229,7 +227,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                 }
 
                 RecipeData.Type.SHAPELESS ->{
-                    if ((p.getTargetBlockExact(5)?:return false).type != Material.CRAFTING_TABLE)return false
+                    if ((p.getTargetBlockExact(4)?:return false).type != Material.CRAFTING_TABLE)return false
                     val contents = p.inventory.contents.clone().map { it?.clone() }.toMutableList()
                     var checked = true
                     for (itemStack in recipe.shapelessMaterials){
@@ -249,7 +247,7 @@ class RecipeMenu(val p: Player): CategorySInventory(Man10Crafting.plugin,"${Man1
                 }
 
                 RecipeData.Type.FURNACE, RecipeData.Type.BLASTING, RecipeData.Type.SMOKING, RecipeData.Type.STONECUTTING ->{
-                    if ((p.getTargetBlockExact(5)?:return false).type != recipe.type.material)return false
+                    if ((p.getTargetBlockExact(4)?:return false).type != recipe.type.material)return false
                     val contents = p.inventory.contents.clone()
                     return contents.any { it?.isSimilar(recipe.singleMaterial) == true }
                 }

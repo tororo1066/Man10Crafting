@@ -35,10 +35,12 @@ class MCCommand: SCommand("mcraft") {
     val getCraftAmount = command().addNeedPermission("mcraft.op").addArg(SCommandArg("log")).addArg(SCommandArg("item")).addArg(
         SCommandArg(Man10Crafting.recipes.keys)).setNormalExecutor {
         val recipe = Man10Crafting.recipes[it.args[2]]!!
-        val sum = SJavaPlugin.mysql.asyncQuery("select sum(amount) from craft_log where recipe = '${it.args[2]}'")
-        sum.forEach { rs ->
-            it.sender.sendPlainMessage(Man10Crafting.prefix + recipe.result.itemMeta.displayName + "§aの合計作成回数:§6" + (rs.getNullableObject("sum(amount)") as? BigDecimal))
+        SJavaPlugin.mysql.callbackQuery("select sum(amount) from craft_log where recipe = '${it.args[2]}'") { sum ->
+            sum.forEach { rs ->
+                it.sender.sendPlainMessage(Man10Crafting.prefix + recipe.result.itemMeta.displayName + "§aの合計作成回数:§6" + (rs.getNullableObject("sum(amount)") as? BigDecimal))
+            }
         }
+
     }
 
     @SCommandBody
@@ -46,10 +48,12 @@ class MCCommand: SCommand("mcraft") {
         SCommandArg(SCommandArgType.ONLINE_PLAYER)).addArg(SCommandArg(Man10Crafting.recipes.keys)).setNormalExecutor {
         val p = Bukkit.getPlayer(it.args[2])!!
         val recipe = Man10Crafting.recipes[it.args[3]]!!
-        val sum = SJavaPlugin.mysql.asyncQuery("select sum(amount) from craft_log where recipe = '${it.args[3]}' and uuid = '${p.uniqueId}'")
-        sum.forEach { rs ->
-            it.sender.sendPlainMessage(Man10Crafting.prefix + "§f§l" + p.name + "§aの" + recipe.result.itemMeta.displayName + "§aの合計作成回数:§6" + rs.getNullableObject("sum(amount)") as? BigDecimal)
+        SJavaPlugin.mysql.callbackQuery("select sum(amount) from craft_log where recipe = '${it.args[3]}' and uuid = '${p.uniqueId}'") { sum ->
+            sum.forEach { rs ->
+                it.sender.sendPlainMessage(Man10Crafting.prefix + "§f§l" + p.name + "§aの" + recipe.result.itemMeta.displayName + "§aの合計作成回数:§6" + rs.getNullableObject("sum(amount)") as? BigDecimal)
+            }
         }
+
     }
 
     @SCommandBody

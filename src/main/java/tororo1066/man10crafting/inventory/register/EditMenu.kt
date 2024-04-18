@@ -15,8 +15,11 @@ import tororo1066.tororopluginapi.defaultMenus.CategorySInventory
 import tororo1066.tororopluginapi.lang.SLang
 import tororo1066.tororopluginapi.sInventory.SInventory
 import tororo1066.tororopluginapi.sInventory.SInventoryItem
+import tororo1066.tororopluginapi.utils.returnItem
 
 class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
+
+    var nowEditCategory = ""
 
     init {
         registerClickSound()
@@ -25,24 +28,46 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
     override fun renderMenu(): Boolean {
         val items = LinkedHashMap<String,ArrayList<SInventoryItem>>()
         Man10Crafting.recipes.entries.sortedBy { it.value.index }.forEach { (key, data) ->
-            val item = SInventoryItem(data.result).addLore(listOf("§f§l[${if (data.enabled) "§a§lEnabled" else "§c§lDisabled"}§f§l]","§a優先度:${data.index}","§7${key}","§eクリックで編集","§6シフトクリックで有効切替","§cシフト右クリックで削除")).setCanClick(false).setClickEvent {
-                if (it.click.isShiftClick){
-                    if (it.click == ClickType.SHIFT_RIGHT){
-                        Bukkit.removeRecipe(NamespacedKey(Man10Crafting.plugin,key))
-                        Man10Crafting.recipes.remove(key)
-                        allRenderMenu()
+            val item = SInventoryItem(data.result)
+                .addLore(
+                    "§f§l[${if (data.enabled) "§a§lEnabled" else "§c§lDisabled"}§f§l]",
+                    "§a優先度:${data.index}",
+                    "§d登録優先度:${data.registerIndex}",
+                    "§b隠す:${data.hidden}",
+                    "§7${key}", "§eクリックで編集",
+                    "§6シフトクリックで有効切替",
+                    "§cシフト右クリックで削除"
+                )
+                .setCanClick(false)
+                .setClickEvent {
+                    if (it.click == ClickType.NUMBER_KEY) {
+                        when(it.hotbarButton) {
+                            1 -> {
+                                (it.whoClicked as Player).returnItem(data.result)
+                            }
+                        }
                         return@setClickEvent
                     }
-                    val syncData = Man10Crafting.recipes[key]!!
-                    syncData.enabled = !syncData.enabled
-                    syncData.saveConfig()
-                    allRenderMenu()
-                } else {
-                    moveChildInventory(editMenu(data),it.whoClicked as Player)
+                    if (it.click.isShiftClick) {
+                        if (it.click == ClickType.SHIFT_RIGHT) {
+                            Bukkit.removeRecipe(NamespacedKey(Man10Crafting.plugin, key))
+                            Man10Crafting.recipes.remove(key)
+                            allRenderMenu()
+                            return@setClickEvent
+                        }
+                        val syncData = Man10Crafting.recipes[key]!!
+                        syncData.enabled = !syncData.enabled
+                        syncData.saveConfig()
+                        allRenderMenu()
+                    } else {
+                        moveChildInventory(editMenu(data), it.whoClicked as Player)
+                    }
                 }
-            }
             val transKey = SLang.translate("categories.${data.category}")
-            if (nowCategory == "") setCategoryName(transKey)
+            if (nowCategory == "") {
+                setCategoryName(transKey)
+                nowEditCategory = data.category
+            }
             if (!items.containsKey(transKey)){
                 items[transKey] = arrayListOf()
             }
@@ -54,10 +79,25 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
         return true
     }
 
+    override fun afterRenderMenu() {
+        super.afterRenderMenu()
+        getSInvItems()[49]?.let {
+
+        }
+    }
+
     private fun editMenu(data: RecipeData): SInventory {
 
-        fun saveItem(): SInventoryItem {
-            return SInventoryItem(Material.WRITABLE_BOOK).setDisplayName("§a上書き保存").setCanClick(false)
+        fun AbstractRegister.saveItem(): SInventoryItem {
+            return SInventoryItem(Material.WRITABLE_BOOK).setDisplayName("§a上書き保存").setCanClick(false).setClickEvent {
+                val p = it.whoClicked as Player
+                if (save(data.namespace,data.category)){
+                    p.sendMessage("§a保存に成功しました")
+                    p.closeInventory()
+                } else {
+                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
+                }
+            }
         }
 
         val recipeEditor : SInventory =
@@ -70,6 +110,8 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                             returnBottle = data.returnBottle
                             perm = data.permission
                             command = data.command
+                            hidden = data.hidden
+                            stackRecipe = data.stackRecipe
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
@@ -83,15 +125,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                                 }
                             }
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -107,6 +141,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                             returnBottle = data.returnBottle
                             perm = data.permission
                             command = data.command
+                            hidden = data.hidden
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
@@ -126,15 +161,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                                 setItem(loc,itemStack)
                             }
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -146,22 +173,16 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : FurnaceRegister(){
                         init {
                             index = data.index
+                            registerIndex = data.registerIndex
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
+                            hidden = data.hidden
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
                             setItem(20,data.singleMaterial)
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -173,22 +194,16 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : SmokingRegister(){
                         init {
                             index = data.index
+                            registerIndex = data.registerIndex
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
+                            hidden = data.hidden
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
                             setItem(20,data.singleMaterial)
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -200,22 +215,16 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : BlastingRegister(){
                         init {
                             index = data.index
+                            registerIndex = data.registerIndex
                             exp = data.furnaceExp
                             furnaceTime = data.furnaceTime
+                            hidden = data.hidden
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
                             setItem(20,data.singleMaterial)
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -231,6 +240,8 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                             data.namespace,
                             data.category,
                             data.index,
+                            data.registerIndex,
+                            data.hidden,
                             data.singleMaterial,
                             data.smithingMaterial,
                             data.smithingAdditionalMaterial,
@@ -253,6 +264,7 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                         recipeData.namespace = saveData.namespace
                         recipeData.category = saveData.category
                         recipeData.index = saveData.index
+                        recipeData.registerIndex = saveData.registerIndex
                         recipeData.saveConfig()
                         recipeData.register()
 
@@ -264,19 +276,17 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
 
                 RecipeData.Type.STONECUTTING-> {
                     val inv = object : StoneCuttingRegister(){
+                        init {
+                            index = data.index
+                            registerIndex = data.registerIndex
+                            hidden = data.hidden
+                        }
+
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
                             setItem(20,data.singleMaterial)
                             setItem(24,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }
@@ -288,22 +298,16 @@ class EditMenu: CategorySInventory(Man10Crafting.plugin,"EditMenu") {
                     val inv = object : BrewingRegister(){
                         init {
                             index = data.index
+                            registerIndex = data.registerIndex
                             brewingTime = data.brewingTime
+                            hidden = data.hidden
                         }
                         override fun renderMenu(): Boolean {
                             super.renderMenu()
                             setItem(19,data.singleMaterial)
                             setItem(22,data.potionInput)
                             setItem(25,data.result)
-                            setItem(43,saveItem().setClickEvent {
-                                val p = it.whoClicked as Player
-                                if (save(data.namespace,data.category)){
-                                    p.sendMessage("§a保存に成功しました")
-                                    p.closeInventory()
-                                } else {
-                                    p.sendMessage("§c素材、または完成品のアイテムが存在しません")
-                                }
-                            })
+                            setItem(43,saveItem())
                             return true
                         }
                     }

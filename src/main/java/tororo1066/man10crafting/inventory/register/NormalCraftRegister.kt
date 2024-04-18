@@ -11,13 +11,13 @@ import tororo1066.tororopluginapi.sInventory.SInventory
 import tororo1066.tororopluginapi.sInventory.SInventoryItem
 import tororo1066.tororopluginapi.sItem.SItem
 
-open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shapeless",5) {
+open class NormalCraftRegister: AbstractRegister("§bShaped/Shapeless") {
 
     var isShaped = false
     var perm = ""
     var returnBottle = false
     var command = ""
-    var index = Int.MAX_VALUE
+    var stackRecipe = false
 
     //0  1  2  3  k  5  6  7  8
     //9  s  s  s  13 14 15 16 17
@@ -81,9 +81,32 @@ open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shape
                         command = str
                         p.sendPlainMessage("§b" + str + "に変更しました")
                     })
-                    setItem(13,createInputItem(SItem(Material.BOOK).setDisplayName("§6レシピブックで表示される優先度").addLore("§a優先度:${index}").addLore("§e数値が低いほど前に出てきます"),Int::class.java,"§a数値を入力してください") { int, p ->
+                    setItem(13, createInputItem(SItem(Material.BOOK).setDisplayName("§6登録、レシピブックの優先度")
+                        .addLore("§a優先度:${index}").addLore("§e数値が低いほど優先されます"), Int::class.java, "§a数値を入力してください") { int, p ->
                         index = int
                         p.sendPlainMessage("§b" + int + "に変更しました")
+                    })
+                    setItem(14, createNullableInputItem(SItem(Material.WRITTEN_BOOK).setDisplayName("§6レシピ登録の優先度")
+                        .addLore("§a優先度:${registerIndex}")
+                        .addLore("§e数値が低いほど先に登録されます")
+                        .addLore("nullでレシピブックの優先度と同じになります"), Int::class.java, "§a数値を入力してください") { int, p ->
+                        registerIndex = int
+                        p.sendPlainMessage("§b" + int + "に変更しました")
+                    })
+                    setItem(15, SInventoryItem(SItem(Material.CYAN_CONCRETE).setDisplayName("§6非表示設定"))
+                        .addLore("§a現在:${if (hidden) "非表示" else "表示"}").setCanClick(false)
+                        .setClickEvent {
+                            hidden = !hidden
+                            allRenderMenu()
+                        })
+                    setItem(16, SInventoryItem(
+                        SItem(Material.OBSIDIAN).setDisplayName("§cスタック可能レシピ")
+                            .addLore("§a現在:${if (stackRecipe) "有効" else "無効"}")
+                            .addLore("§eレシピのアイテムをスタックできるようにするか")
+                            .addLore("§e定型レシピのみ有効です")
+                    ).setCanClick(false).setClickEvent {
+                        stackRecipe = !stackRecipe
+                        allRenderMenu()
                     })
                     return true
                 }
@@ -106,21 +129,20 @@ open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shape
         return true
     }
 
-    fun save(namespace: String, category: String): Boolean {
+    override fun save(namespace: String, category: String, recipeData: RecipeData): Boolean {
         val result = getItem(24)?:return false
 
-        listOf(10,11,12,19,20,21,28,29,30).forEach {
-            inv.getItem(it)?.amount = 1
+        if (!stackRecipe) {
+            listOf(10,11,12,19,20,21,28,29,30).forEach {
+                inv.getItem(it)?.amount = 1
+            }
         }
 
-        val recipeData = RecipeData()
-        recipeData.namespace = namespace
-        recipeData.category = category
         recipeData.permission = perm
         recipeData.result = result
         recipeData.returnBottle = returnBottle
-        recipeData.index = index
-
+        recipeData.command = command
+        recipeData.stackRecipe = stackRecipe
 
         if (isShaped){
             recipeData.type = RecipeData.Type.SHAPED
@@ -153,8 +175,6 @@ open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shape
             val row2 = itemTask(19,20,21)
             val row3 = itemTask(28,29,30)
             recipeData.shape.addAll(listOf(row1,row2,row3))
-            recipeData.saveConfig()
-            recipeData.register()
 
         } else {
             recipeData.type = RecipeData.Type.SHAPELESS
@@ -162,10 +182,7 @@ open class NormalCraftRegister: SInventory(Man10Crafting.plugin,"§bShaped/Shape
             listOf(10,11,12,19,20,21,28,29,30).forEach {
                 recipeData.shapelessMaterials.add(getItem(it)?:return@forEach)
             }
-
-            recipeData.saveConfig()
-            recipeData.register()
         }
-        return true
+        return super.save(namespace, category, recipeData)
     }
 }

@@ -24,7 +24,7 @@ allprojects {
     }
 
     dependencies {
-        api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+        compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
         api 'tororo1066:tororopluginapi:a1ab1cdc'
     }
 
@@ -85,8 +85,13 @@ buildscript {
 }
 
 dependencies {
+    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     compileOnly 'io.papermc.paper:paper-api:1.19.3-R0.1-SNAPSHOT'
-    implementation project(':SmithCrafting')
+    implementation project(':SmithCrafting:base')
+    implementation(project(':SmithCrafting:above_1_20')) {
+        exclude group: 'io.papermc.paper', module: 'paper-api'
+    }
+    implementation project(':SmithCrafting:below_1_20')
 }
 
 shadowJar {

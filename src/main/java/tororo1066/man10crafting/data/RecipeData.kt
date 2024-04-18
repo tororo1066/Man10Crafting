@@ -19,6 +19,7 @@ class RecipeData {
     val materials = HashMap<Char,ItemStack>()
     val shapelessMaterials = ArrayList<ItemStack>()
     val shape = ArrayList<String>()
+    var stackRecipe = false
     lateinit var result: ItemStack
     lateinit var singleMaterial: ItemStack
     var furnaceExp = 0f
@@ -42,6 +43,8 @@ class RecipeData {
     var returnBottle = true
     var command = ""
     var index = Int.MAX_VALUE
+    var registerIndex: Int? = null
+    var hidden = false
 
     companion object{
         fun loadFromYml(category: String, id: String): RecipeData {
@@ -57,6 +60,7 @@ class RecipeData {
                         recipe.materials[it.toCharArray()[0]] = section.getItemStack(it)!!
                     }
                     recipe.shape.addAll(yml.getStringList("shape"))
+                    recipe.stackRecipe = yml.getBoolean("stackRecipe",false)
                 }
                 Type.SHAPELESS->{
                     @Suppress("UNCHECKED_CAST")
@@ -89,6 +93,8 @@ class RecipeData {
             recipe.returnBottle = yml.getBoolean("returnBottle")
             recipe.command = yml.getString("command","")!!
             recipe.index = yml.getInt("index",Int.MAX_VALUE)
+            recipe.registerIndex = if (yml.contains("registerIndex")) yml.getInt("registerIndex") else null
+            recipe.hidden = yml.getBoolean("hidden")
 
             return recipe
         }
@@ -151,6 +157,7 @@ class RecipeData {
             Type.SHAPED->{
                 config.set("material",materials)
                 config.set("shape",shape)
+                config.set("stackRecipe",stackRecipe)
             }
             Type.SHAPELESS->{
                 config.set("material",shapelessMaterials)
@@ -194,6 +201,10 @@ class RecipeData {
         if (index != Int.MAX_VALUE){
             config.set("index",index)
         }
+
+        config.set("registerIndex",registerIndex)
+
+        config.set("hidden",hidden)
 
         config.set("enabled",enabled)
 

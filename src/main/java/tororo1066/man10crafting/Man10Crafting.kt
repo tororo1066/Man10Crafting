@@ -34,11 +34,16 @@ class Man10Crafting: SJavaPlugin(UseOption.MySQL) {
         }
         val folder = File("${dataFolder.path}/recipes/")
         if (!folder.exists()) folder.mkdirs()
+        val dataList = mutableListOf<RecipeData>()
         folder.listFiles()?.forEach {
             (it.listFiles()?:return@forEach).forEach { file ->
                 val data = RecipeData.loadFromYml(it.nameWithoutExtension,file.nameWithoutExtension)
-                data.register()
+                dataList.add(data)
             }
+        }
+
+        dataList.sortedBy { it.registerIndex?:it.index }.forEach {
+            it.register()
         }
 
         enabledAutoCraft = config.getBoolean("enabledAutoCraft",true)
@@ -54,7 +59,7 @@ class Man10Crafting: SJavaPlugin(UseOption.MySQL) {
         sInput = SInput(this)
         smithUtil = SmithBase.getInstance()
 
-        mysql.callbackExecute("CREATE TABLE `craft_log` (\n" +
+        mysql.callbackExecute("CREATE TABLE IF NOT EXISTS `craft_log` (\n" +
                 "\t`id` INT(10) NOT NULL AUTO_INCREMENT,\n" +
                 "\t`type` VARCHAR(10) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
                 "\t`uuid` VARCHAR(36) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +

@@ -19,6 +19,21 @@ import kotlin.math.min
 
 class CraftListener {
 
+    companion object {
+        private fun CraftingInventory.checkStackRecipe(recipeData: RecipeData): Boolean {
+            recipeData.shape.forEachIndexed { i, strings ->
+                strings.forEachIndexed second@ { j, c ->
+                    if (c == ' ')return@second
+                    val item = this.getItem((i * 3 + j) + 1)?:return false
+                    if (item.amount < recipeData.materials[c]!!.amount) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+    }
+
     @SEventHandler
     fun event(e: PrepareItemCraftEvent){
         val eventRecipe = e.recipe?:return
@@ -28,6 +43,12 @@ class CraftListener {
         val recipe = Man10Crafting.recipes[namespacedKey.key]?:return
         if (!recipe.checkNeed(e.view.player as Player)) {
             e.inventory.result = ItemStack(Material.AIR)
+            return
+        }
+
+        if (!e.inventory.checkStackRecipe(recipe)){
+            e.inventory.result = ItemStack(Material.AIR)
+            return
         }
     }
 
@@ -43,14 +64,77 @@ class CraftListener {
             e.isCancelled = true
             e.inventory.result = ItemStack(Material.AIR)
         }
+        if (!e.inventory.checkStackRecipe(recipe)){
+            e.isCancelled = true
+            e.inventory.result = ItemStack(Material.AIR)
+        }
         if (e.isCancelled)return
+
+        if (recipe.stackRecipe && recipe.type == RecipeData.Type.SHAPED) {
+            e.isCancelled = true
+
+            var amount = 64
+            if (e.isShiftClick) {
+                recipe.shape.forEachIndexed { i, strings ->
+                    strings.forEachIndexed second@ { j, c ->
+                        if (c == ' ')return@second
+                        val item = e.inventory.getItem((i * 3 + j) + 1)?:return@second
+                        amount = min(amount, item.amount / recipe.materials[c]!!.amount)
+                    }
+                }
+            } else {
+                amount = 1
+            }
+
+            var remainItemAmount = 0
+            if (e.isShiftClick) {
+                val addItem = e.whoClicked.inventory.addItem(recipe.result.clone().apply { this.amount *= amount })
+                remainItemAmount = addItem.values.sumOf { it.amount }
+            } else {
+                if (e.view.cursor != null && e.view.cursor!!.type != Material.AIR) {
+                    val cursor = e.view.cursor!!
+                    if (!cursor.isSimilar(recipe.result)) {
+                        e.isCancelled = true
+                        return
+                    }
+
+                    if (cursor.amount + recipe.result.amount * amount > cursor.maxStackSize) {
+                        e.isCancelled = true
+                        return
+                    }
+                    cursor.amount += recipe.result.amount * amount
+                } else {
+                    e.view.cursor = recipe.result.clone().apply { this.amount *= amount }
+                }
+            }
+
+            recipe.shape.forEachIndexed { i, strings ->
+                strings.forEachIndexed second@ { j, c ->
+                    if (c == ' ')return@second
+                    val item = e.inventory.getItem((i * 3 + j) + 1)?:return@second
+                    item.amount -= recipe.materials[c]!!.amount * (amount - remainItemAmount)
+                }
+            }
+
+            if (!e.inventory.checkStackRecipe(recipe)) {
+                e.inventory.result = ItemStack(Material.AIR)
+            }
+
+            if (recipe.command.isNotBlank()){
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(),recipe.command.replace("<name>",e.whoClicked.name).replace("<uuid>",e.whoClicked.uniqueId.toString()))
+            }
+
+            SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('STACK_PED','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${amount},now())") {}
+            return
+        }
+
         if (recipe.returnBottle) {
             (1..9).forEach {
                 val item = e.inventory.getItem(it)?:return@forEach
-                    if (item.type == Material.POTION){
+                if (item.type == Material.POTION) {
                     Bukkit.getScheduler().runTaskLater(Man10Crafting.plugin, Runnable {
                         e.inventory.setItem(it, ItemStack(Material.GLASS_BOTTLE))
-                    },0)
+                    }, 0)
                 }
             }
         }

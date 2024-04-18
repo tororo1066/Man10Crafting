@@ -8,6 +8,6 @@ tasks {
 
 dependencies {
     api project(':SmithCrafting:base')
-    api project(':SmithCrafting:above_1_20')
-    api project(':SmithCrafting:below_1_20')
+    implementation project(':SmithCrafting:above_1_20')
+    implementation project(':SmithCrafting:below_1_20')
 }

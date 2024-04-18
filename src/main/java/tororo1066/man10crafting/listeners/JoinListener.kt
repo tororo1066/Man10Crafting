@@ -9,6 +9,10 @@ class JoinListener {
 
     @SEventHandler
     fun join(e: PlayerJoinEvent){
-        e.player.discoverRecipes(Man10Crafting.recipes.filter { it.value.checkNeed(e.player) }.map { NamespacedKey(Man10Crafting.plugin,it.key) })
+        e.player.discoverRecipes(
+            Man10Crafting.recipes.filter {
+                it.value.checkNeed(e.player) && !it.value.hidden
+            }.map { NamespacedKey(Man10Crafting.plugin,it.key) }
+        )
     }
 }
