@@ -1,27 +1,25 @@
-package tororo1066.man10crafting.inventory.register.furnace
+package tororo1066.man10crafting.inventory.register
 
+import io.papermc.paper.datacomponent.DataComponentTypes
+import io.papermc.paper.datacomponent.item.TooltipDisplay
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.scheduler.BukkitRunnable
 import tororo1066.man10crafting.ingredient.AbstractIngredient
 import tororo1066.man10crafting.ingredient.ItemStackIngredient
-import tororo1066.man10crafting.inventory.register.AbstractRegister
-import tororo1066.man10crafting.inventory.register.Items
 import tororo1066.man10crafting.inventory.register.Items.emptyIngredientItem
 import tororo1066.man10crafting.inventory.register.Items.optionsItem
 import tororo1066.man10crafting.inventory.register.Items.setAdvancedModeItem
-import tororo1066.man10crafting.recipe.furnace.AbstractFurnaceRecipe
+import tororo1066.man10crafting.recipe.stonecutting.StonecuttingCraftingRecipe
 import tororo1066.tororopluginapi.SJavaPlugin
-import tororo1066.tororopluginapi.sItem.SItem
+import tororo1066.tororopluginapi.sInventory.SInventoryItem
 
-abstract class AbstractFurnaceRegister<T: AbstractFurnaceRecipe>(
-    name: String,
-    currentData: T,
-    isEdit: Boolean
-): AbstractRegister<T>(
-    name,
-    currentData,
-    isEdit
+class StonecuttingRegister(
+    currentData: StonecuttingCraftingRecipe? = null,
+) : AbstractRegister<StonecuttingCraftingRecipe>(
+    "§7Stonecutter",
+    currentData ?: StonecuttingCraftingRecipe(),
+    currentData != null
 ) {
 
     var input: Pair<AbstractIngredient, Int>? = null
@@ -38,7 +36,7 @@ abstract class AbstractFurnaceRegister<T: AbstractFurnaceRecipe>(
 
     private fun editItem(ingredient: AbstractIngredient, index: Int) =
         ingredient.editItem(this, index) { p, newIngredient ->
-            this.input = if (newIngredient == null) null else Pair(newIngredient, 0)
+            input = if (newIngredient == null) null else Pair(newIngredient, 0)
             allRenderMenu(p)
         }
 
@@ -58,26 +56,27 @@ abstract class AbstractFurnaceRegister<T: AbstractFurnaceRecipe>(
 
         currentData.input = input.first
         currentData.result = result
-
         return true
     }
 
     //0  1  2  3  p  5  6  7  8
     //9  10 11 12 a  14 15 16 17
     //18 19 i  21 22 23 o  25 26
-    //27 28 29 e  31 t  33 34 35
+    //27 28 29 30 31 32 33 34 35
     //36 37 38 39 40 41 42 43 s
-    //p = options
-    //a = advanced mode
-    //e = experience
-    //i = input
-    //o = output
-    //t = cooking time
-    //s = save
+    //p: options
+    //a: advanced mode
+    //i: input
+    //o: output
+    //s: save
 
     init {
         fillItem(Items.backgroundLightBlue())
         setItems(listOf(11,15,19,21,23,25,29,33), Items.backgroundWhite())
+        setItem(22, SInventoryItem(Material.STONECUTTER).editRaw {
+            @Suppress("UnstableApiUsage")
+            it.setData(DataComponentTypes.TOOLTIP_DISPLAY, TooltipDisplay.tooltipDisplay().hideTooltip(true))
+        })
         removeItems(listOf(20,24))
 
         this.currentData.getInputOrNull()?.let {
@@ -118,33 +117,7 @@ abstract class AbstractFurnaceRegister<T: AbstractFurnaceRecipe>(
             }
         }
 
-        setItem(
-            30,
-            createInputItem(
-                SItem(Material.EXPERIENCE_BOTTLE)
-                    .setDisplayName("§a経験値量")
-                    .addLore("§e現在: ${currentData.experience}"),
-                Double::class.java,
-                "§a経験値量を入力してください"
-            ) { exp, _ ->
-                currentData.experience = exp.toFloat()
-            }
-        )
-
-        setItem(
-            32,
-            createInputItem(
-                SItem(Material.CLOCK)
-                    .setDisplayName("§a精錬時間")
-                    .addLore("§e現在: ${currentData.cookingTime} ticks"),
-                Int::class.java,
-                "§a精錬時間をtickで入力してください"
-            ) { time, _ ->
-                currentData.cookingTime = time
-            }
-        )
-
-        setItem(4, optionsItem(currentData))
+        setItem(4, optionsItem(this.currentData))
 
         setItem(44, saveItem())
 

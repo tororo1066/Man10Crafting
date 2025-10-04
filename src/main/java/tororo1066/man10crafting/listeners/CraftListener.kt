@@ -1,261 +1,235 @@
 package tororo1066.man10crafting.listeners
 
-import org.bukkit.Bukkit
 import org.bukkit.Keyed
-import org.bukkit.Material
+import org.bukkit.Location
 import org.bukkit.block.BrewingStand
 import org.bukkit.entity.Player
-import org.bukkit.event.EventPriority
+import org.bukkit.event.block.BlockCookEvent
 import org.bukkit.event.block.BrewingStartEvent
+import org.bukkit.event.block.CrafterCraftEvent
 import org.bukkit.event.inventory.*
-import org.bukkit.inventory.*
+import org.bukkit.inventory.BrewerInventory
+import org.bukkit.inventory.CraftingInventory
+import org.bukkit.inventory.StonecutterInventory
 import tororo1066.man10crafting.Man10Crafting
-import tororo1066.man10crafting.data.RecipeData
-import tororo1066.tororopluginapi.SJavaPlugin
+import tororo1066.man10crafting.recipe.AbstractRecipe
+import tororo1066.man10crafting.recipe.paper.BrewingCraftingRecipe
+import tororo1066.man10crafting.recipe.stonecutting.StonecuttingCraftingRecipe
 import tororo1066.tororopluginapi.annotation.SEventHandler
 import tororo1066.tororopluginapi.utils.LocType
 import tororo1066.tororopluginapi.utils.toLocString
-import kotlin.math.min
+import java.time.LocalDateTime
 
 class CraftListener {
 
-    companion object {
-        private fun CraftingInventory.checkStackRecipe(recipeData: RecipeData): Boolean {
-            recipeData.shape.forEachIndexed { i, strings ->
-                strings.forEachIndexed second@ { j, c ->
-                    if (c == ' ')return@second
-                    val item = this.getItem((i * 3 + j) + 1)?:return false
-                    if (item.amount < recipeData.materials[c]!!.amount) {
-                        return false
-                    }
-                }
+    private fun insertLog(recipe: AbstractRecipe, player: Player? = null, location: Location, amount: Int) {
+        Man10Crafting.sDatabase.backGroundInsert(
+            "craft_log",
+            mapOf(
+                "type" to recipe.javaClass.simpleName,
+                "uuid" to (player?.uniqueId?.toString() ?: "none"),
+                "name" to (player?.name ?: "none"),
+                "location" to location.toLocString(LocType.WORLD_BLOCK_SPACE),
+                "recipe" to "${recipe.category}/${recipe.key}",
+                "amount" to amount,
+                "date" to LocalDateTime.now()
+            )
+        )
+    }
+
+    private fun CraftingInventory.checkCanCraftVanilla(): Boolean {
+        if (!Man10Crafting.disabledVanillaCraftWithCustomModelDataItem) return true
+
+        (1..9).forEach {
+            val item = this.getItem(it)?:return@forEach
+            if (item.hasItemMeta() && item.itemMeta.hasCustomModelDataComponent()) {
+                return false
             }
-            return true
+        }
+        return true
+    }
+
+    @SEventHandler
+    fun event(e: PrepareItemCraftEvent) {
+        val eventRecipe = e.recipe ?: return
+        if (eventRecipe !is Keyed) return
+        val namespacedKey = eventRecipe.key
+
+        if (namespacedKey.namespace == "minecraft" && !e.inventory.checkCanCraftVanilla()) {
+            e.inventory.result = null
+            return
+        }
+
+        if (namespacedKey.namespace != "man10crafting") return
+        val recipe = Man10Crafting.recipes[namespacedKey] ?: return
+        if (!recipe.enabled || !recipe.craftable(e)) {
+            e.inventory.result = null
+            return
         }
     }
 
     @SEventHandler
-    fun event(e: PrepareItemCraftEvent){
-        val eventRecipe = e.recipe?:return
-        if (eventRecipe !is Keyed)return
-        val namespacedKey = eventRecipe.key
-        if (namespacedKey.namespace != "man10crafting")return
-        val recipe = Man10Crafting.recipes[namespacedKey.key]?:return
-        if (!recipe.checkNeed(e.view.player as Player)) {
-            e.inventory.result = ItemStack(Material.AIR)
-            return
-        }
-
-        if (!e.inventory.checkStackRecipe(recipe)){
-            e.inventory.result = ItemStack(Material.AIR)
-            return
-        }
-    }
-
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: CraftItemEvent){
-        if (e.isCancelled)return
+    fun event(e: CraftItemEvent) {
+        if (e.isCancelled) return
         val eventRecipe = e.recipe
-        if (eventRecipe !is Keyed)return
+        if (eventRecipe !is Keyed) return
         val namespacedKey = eventRecipe.key
-        if (namespacedKey.namespace != "man10crafting")return
-        val recipe = Man10Crafting.recipes[namespacedKey.key]?:return
-        if (!recipe.checkNeed(e.whoClicked as Player)){
+
+        if (namespacedKey.namespace == "minecraft" && !e.inventory.checkCanCraftVanilla()) {
             e.isCancelled = true
-            e.inventory.result = ItemStack(Material.AIR)
-        }
-        if (!e.inventory.checkStackRecipe(recipe)){
-            e.isCancelled = true
-            e.inventory.result = ItemStack(Material.AIR)
-        }
-        if (e.isCancelled)return
-
-        if (recipe.stackRecipe && recipe.type == RecipeData.Type.SHAPED) {
-            e.isCancelled = true
-
-            var amount = 64
-            if (e.isShiftClick) {
-                recipe.shape.forEachIndexed { i, strings ->
-                    strings.forEachIndexed second@ { j, c ->
-                        if (c == ' ')return@second
-                        val item = e.inventory.getItem((i * 3 + j) + 1)?:return@second
-                        amount = min(amount, item.amount / recipe.materials[c]!!.amount)
-                    }
-                }
-            } else {
-                amount = 1
-            }
-
-            var remainItemAmount = 0
-            if (e.isShiftClick) {
-                val addItem = e.whoClicked.inventory.addItem(recipe.result.clone().apply { this.amount *= amount })
-                remainItemAmount = addItem.values.sumOf { it.amount }
-            } else {
-                if (e.view.cursor != null && e.view.cursor!!.type != Material.AIR) {
-                    val cursor = e.view.cursor!!
-                    if (!cursor.isSimilar(recipe.result)) {
-                        e.isCancelled = true
-                        return
-                    }
-
-                    if (cursor.amount + recipe.result.amount * amount > cursor.maxStackSize) {
-                        e.isCancelled = true
-                        return
-                    }
-                    cursor.amount += recipe.result.amount * amount
-                } else {
-                    e.view.cursor = recipe.result.clone().apply { this.amount *= amount }
-                }
-            }
-
-            recipe.shape.forEachIndexed { i, strings ->
-                strings.forEachIndexed second@ { j, c ->
-                    if (c == ' ')return@second
-                    val item = e.inventory.getItem((i * 3 + j) + 1)?:return@second
-                    item.amount -= recipe.materials[c]!!.amount * (amount - remainItemAmount)
-                }
-            }
-
-            if (!e.inventory.checkStackRecipe(recipe)) {
-                e.inventory.result = ItemStack(Material.AIR)
-            }
-
-            if (recipe.command.isNotBlank()){
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(),recipe.command.replace("<name>",e.whoClicked.name).replace("<uuid>",e.whoClicked.uniqueId.toString()))
-            }
-
-            SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('STACK_PED','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${amount},now())") {}
+            e.inventory.result = null
             return
         }
 
-        if (recipe.returnBottle) {
-            (1..9).forEach {
-                val item = e.inventory.getItem(it)?:return@forEach
-                if (item.type == Material.POTION) {
-                    Bukkit.getScheduler().runTaskLater(Man10Crafting.plugin, Runnable {
-                        e.inventory.setItem(it, ItemStack(Material.GLASS_BOTTLE))
-                    }, 0)
-                }
-            }
-        }
-        if (recipe.command.isNotBlank()){
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(),recipe.command.replace("<name>",e.whoClicked.name).replace("<uuid>",e.whoClicked.uniqueId.toString()))
-        }
-        var amount = 1
-        if (e.isShiftClick){
-            amount = e.inventory.maxStackSize
-            for (matrix in e.inventory.matrix){
-                if (matrix == null || matrix.type.isAir)continue
-                val matrixAmount = matrix.amount
-                if (matrixAmount < amount) amount = matrixAmount
-            }
-        }
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${amount},now())") {}
-    }
-
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: FurnaceSmeltEvent){
-        if (e.isCancelled)return
-        val eventRecipe = e.recipe?:return
-        if (eventRecipe.key.namespace != "man10crafting")return
-        val recipe = Man10Crafting.recipes[eventRecipe.key.key]?:return
-        if (!recipe.enabled) {
+        if (namespacedKey.namespace != "man10crafting") return
+        val recipe = Man10Crafting.recipes[namespacedKey] ?: return
+        if (!recipe.enabled || !recipe.craftable(e)) {
             e.isCancelled = true
+            e.inventory.result = null
             return
         }
 
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','none','none','${e.block.location.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',1,now())") {}
+        val amount = recipe.performCraft(e)
+
+        if (amount > 0) {
+            val player = e.whoClicked as? Player ?: return
+            insertLog(recipe, player, player.location, amount)
+        }
     }
 
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: PrepareSmithingEvent){
-        val eventRecipe = e.inventory.recipe?:return
-        if (eventRecipe !is Keyed)return
+    @SEventHandler
+    fun event(e: CrafterCraftEvent) {
+        if (Man10Crafting.recipes.containsKey(e.recipe.key)) {
+            e.isCancelled = true
+        }
+    }
+
+    @SEventHandler
+    fun event(e: BlockCookEvent) {
+        if (e.isCancelled) return
+        val eventRecipe = e.recipe ?: return
         val namespacedKey = eventRecipe.key
-        if (namespacedKey.namespace != "man10crafting")return
-        val recipe = Man10Crafting.recipes[namespacedKey.key]?:return
-        if (!recipe.checkNeed(e.view.player as Player)){
-            e.result = ItemStack(Material.AIR)
-            return
-        }
-        e.result = recipe.result
-    }
-
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: SmithItemEvent){
-        if (e.isCancelled)return
-        val eventRecipe = e.inventory.recipe?:return
-        if (eventRecipe !is Keyed)return
-        val namespacedKey = eventRecipe.key
-        if (namespacedKey.namespace != "man10crafting")return
-        val recipe = Man10Crafting.recipes[namespacedKey.key]?:return
-        if (!recipe.checkNeed(e.whoClicked as Player)){
+        if (namespacedKey.namespace != "man10crafting") return
+        val recipe = Man10Crafting.recipes[namespacedKey] ?: return
+        if (!recipe.enabled || !recipe.craftable(e)) {
             e.isCancelled = true
             return
         }
-        if (!e.isCancelled){
-            e.inventory.result = recipe.result
-        }
 
-        SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','${e.whoClicked.uniqueId}','${e.whoClicked.name}','${e.inventory.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',${min(e.inventory.inputEquipment?.amount?:0,e.inventory.inputMineral?.amount?:0)},now())") {}
-    }
+        val amount = recipe.performCraft(e)
 
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: InventoryClickEvent){
-        if (e.isCancelled)return
-        val item = e.currentItem?:return
-        if (item.amount <= item.maxStackSize)return
-        val inv = e.clickedInventory?:return
-        when(inv){
-            is CraftingInventory ->{
-                if (e.slot !in 1..9)return
-                e.isCancelled = true
-            }
-
-            is FurnaceInventory ->{
-                if (e.slot != 0)return
-                e.isCancelled = true
-            }
-
-            is SmithingInventory ->{
-                if (e.slot !in 0..1)return
-                e.isCancelled = true
-            }
-
-            is StonecutterInventory ->{
-                if (e.slot != 0)return
-                e.isCancelled = true
-            }
+        if (amount > 0) {
+            insertLog(recipe, null, e.block.location, amount)
         }
     }
 
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: BrewingStartEvent){
-        val ingredient = e.source
-        val stand = e.block.state as BrewingStand
-        var maxBrewingTime = -1
-        (0..2).forEach { index ->
-            val item = stand.inventory.getItem(index)?:return@forEach
-            val recipe = Man10Crafting.recipes.entries.find {
-                it.value.type == RecipeData.Type.BREWING && it.value.potionInput == item && it.value.singleMaterial == ingredient
-            }?.value?:return@forEach
-            maxBrewingTime = maxBrewingTime.coerceAtLeast(recipe.brewingTime)
-        }
-        if (maxBrewingTime != -1){
-            e.totalBrewTime = maxBrewingTime
+    @SEventHandler
+    fun event(e: PrepareSmithingEvent) {
+        val eventRecipe = e.inventory.recipe ?: return
+        if (eventRecipe !is Keyed) return
+        val namespacedKey = eventRecipe.key
+        if (namespacedKey.namespace != "man10crafting") return
+        val recipe = Man10Crafting.recipes[namespacedKey] ?: return
+        if (!recipe.enabled || !recipe.craftable(e)) {
+            e.inventory.result = null
+            return
         }
     }
 
-    @SEventHandler(EventPriority.LOWEST)
-    fun event(e: BrewEvent){
-        if (e.isCancelled)return
+    @SEventHandler
+    fun event(e: SmithItemEvent) {
+        if (e.isCancelled) return
+        val eventRecipe = e.inventory.recipe ?: return
+        if (eventRecipe !is Keyed) return
+        val namespacedKey = eventRecipe.key
+        if (namespacedKey.namespace != "man10crafting") return
+        val recipe = Man10Crafting.recipes[namespacedKey] ?: return
+        if (!recipe.enabled || !recipe.craftable(e)) {
+            e.isCancelled = true
+            e.inventory.result = null
+            return
+        }
 
-        (0..2).forEach { index ->
-            val item = e.contents.getItem(index)?:return@forEach
-            val recipe = Man10Crafting.recipes.entries.find {
-                it.value.type == RecipeData.Type.BREWING && it.value.potionInput == item && it.value.singleMaterial == e.contents.ingredient
-            }?.value?:return@forEach
-            SJavaPlugin.mysql.callbackExecute("insert into craft_log (type,uuid,mcid,location,recipe,amount,date) values('${recipe.type.name}','none','none','${e.contents.location?.toLocString(LocType.WORLD_BLOCK_SPACE)}','${recipe.namespace}',1,now())") {}
+        val amount = recipe.performCraft(e)
+        if (amount > 0) {
+            val player = e.whoClicked as? Player ?: return
+            insertLog(recipe, player, player.location, amount)
+        }
+    }
+
+    @SEventHandler // Stonecutter
+    fun event(e: InventoryClickEvent) {
+        if (e.isCancelled) return
+        val inventory = e.inventory
+        if (inventory !is StonecutterInventory) return
+        if (e.clickedInventory != inventory) return
+        if (e.slot != 1) return
+        val input = inventory.inputItem ?: return
+        val result = inventory.result ?: return
+        val recipe = Man10Crafting.recipes.values.firstOrNull {
+            it is StonecuttingCraftingRecipe && result == it.result && it.input.validate(input)
+        } ?: return
+
+        if (!recipe.enabled || !recipe.craftable(e)) {
+            e.isCancelled = true
+            inventory.result = null
+            return
+        }
+
+        val amount = recipe.performCraft(e)
+
+        if (amount > 0) {
+            val player = e.whoClicked as? Player ?: return
+            insertLog(recipe, player, player.location, amount)
+        }
+    }
+
+    @Suppress("UnstableApiUsage")
+    @SEventHandler
+    fun event(e: BrewingStartEvent) {
+        val inventory = (e.block.state as? BrewingStand)?.inventory ?: return
+        val recipes = getBrewingRecipes(inventory)
+        if (recipes.isEmpty()) return
+        var canBrew = true
+        recipes.forEach { recipe ->
+            if (!recipe.enabled || !recipe.craftable(e)) {
+                e.brewingTime = Int.MAX_VALUE
+                canBrew = false
+            }
+        }
+
+        if (!canBrew) return
+        e.brewingTime = recipes.maxOf { it.brewingTime }
+    }
+
+    @SEventHandler
+    fun event(e: BrewEvent) {
+        if (e.isCancelled) return
+        val inventory = e.contents
+        val recipes = getBrewingRecipes(inventory)
+        if (recipes.isEmpty()) return
+        recipes.forEach { recipe ->
+            if (!recipe.enabled || !recipe.craftable(e)) {
+                e.isCancelled = true
+                return@forEach
+            }
+
+            val amount = recipe.performCraft(e)
+            if (amount > 0) {
+                insertLog(recipe, null, e.block.location, amount)
+            }
+        }
+    }
+
+    private fun getBrewingRecipes(inventory: BrewerInventory): List<BrewingCraftingRecipe> {
+        val ingredientItem = inventory.ingredient ?: return listOf()
+        val inputs = listOfNotNull(
+            inventory.getItem(0),
+            inventory.getItem(1),
+            inventory.getItem(2)
+        )
+        return Man10Crafting.recipes.values.filterIsInstance<BrewingCraftingRecipe>().filter {
+            it.ingredient.validate(ingredientItem) && inputs.any { input -> it.input.validate(input) }
         }
     }
 }

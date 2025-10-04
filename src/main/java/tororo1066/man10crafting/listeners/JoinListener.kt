@@ -9,10 +9,24 @@ class JoinListener {
 
     @SEventHandler
     fun join(e: PlayerJoinEvent){
-        e.player.discoverRecipes(
-            Man10Crafting.recipes.filter {
-                it.value.checkNeed(e.player) && !it.value.hidden
-            }.map { NamespacedKey(Man10Crafting.plugin,it.key) }
-        )
+        val discoverable = ArrayList<NamespacedKey>()
+        val undiscoverable = ArrayList<NamespacedKey>()
+        Man10Crafting.recipes.values.forEach {
+            if (it.enabled && it.accessible(e.player) && !it.hidden){
+                discoverable.add(it.namespacedKey)
+            } else {
+                undiscoverable.add(it.namespacedKey)
+            }
+        }
+
+        e.player.discoveredRecipes.forEach {
+            if (it.namespace != "man10crafting") return@forEach
+            if (!Man10Crafting.recipes.containsKey(it)) {
+                undiscoverable.add(it)
+            }
+        }
+
+        e.player.discoverRecipes(discoverable)
+        e.player.undiscoverRecipes(undiscoverable)
     }
 }

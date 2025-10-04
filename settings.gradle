@@ -1,6 +1,0 @@
-rootProject.name = 'Man10Crafting'
-
-include('SmithCrafting')
-include('SmithCrafting:base')
-include('SmithCrafting:above_1_20')
-include('SmithCrafting:below_1_20')
